@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'pre_admission_test.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -76,7 +77,7 @@ class HomePage extends StatelessWidget {
                 accentColor: const Color(0xFF0F9D58),
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const FeaturePage(title: "Assessment Form Builder")),
+                  MaterialPageRoute(builder: (context) => const PreAdmissionTestPage()),
                 ),
               ),
               const SizedBox(height: 20),
