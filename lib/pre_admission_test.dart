@@ -12,8 +12,7 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
   int _currentIndex = 0;
 
   final Map<String, int> _varkScores = {'V': 0, 'A': 0, 'R': 0, 'K': 0};
-  
-  // Personality Traits
+
   int _structuredScore = 0;
   int _exploratoryScore = 0;
   int _introvertScore = 0;
@@ -21,7 +20,11 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
   int _impulsivityScore = 0;
   int _reflectivityScore = 0;
 
-  // 题目数据库
+  // ✅ NEW: student info
+  String _studentName = "";
+  String _emergencyContact = "";
+  bool _started = false;
+
   final List<Map<String, dynamic>> _questions = [
     {
       'theme': 'Theme 1: Acquiring New Knowledge',
@@ -222,15 +225,15 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
         {'text': 'I imagined the scenes in my head like a movie while answering.', 'tags': ['V', 'Exploratory']},
         {'text': 'I imagined someone asking me these questions in an interview.', 'tags': ['A', 'Extrovert']},
       ]
-    }
+    },
   ];
 
-  // 处理单选题的点击事件
   void _answerQuestion(List<String> tags) {
     setState(() {
-      // 1. 解析并分配隐藏分数
       for (var tag in tags) {
-        if (_varkScores.containsKey(tag)) _varkScores[tag] = _varkScores[tag]! + 1;
+        if (_varkScores.containsKey(tag)) {
+          _varkScores[tag] = _varkScores[tag]! + 1;
+        }
         if (tag == 'Structured') _structuredScore++;
         if (tag == 'Exploratory') _exploratoryScore++;
         if (tag == 'Introvert') _introvertScore++;
@@ -239,7 +242,6 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
         if (tag == 'Reflectivity') _reflectivityScore++;
       }
 
-      // 2. 如果还有题目，进入下一题；如果没了，直接提交生成报告
       if (_currentIndex < _questions.length - 1) {
         _currentIndex++;
       } else {
@@ -248,7 +250,6 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
     });
   }
 
-  // 提交整份问卷
   void _submitTest() {
     Navigator.pushReplacement(
       context,
@@ -256,9 +257,12 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
         builder: (context) => ReportPage(
           varkScores: _varkScores,
           pScores: {
-            'S': _structuredScore, 'E': _exploratoryScore,
-            'I': _introvertScore, 'X': _extrovertScore,
-            'P': _impulsivityScore, 'R': _reflectivityScore,
+            'S': _structuredScore,
+            'E': _exploratoryScore,
+            'I': _introvertScore,
+            'X': _extrovertScore,
+            'P': _impulsivityScore,
+            'R': _reflectivityScore,
           },
         ),
       ),
@@ -267,12 +271,16 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
 
   @override
   Widget build(BuildContext context) {
-    double progress = (_currentIndex + 1) / _questions.length;
+    double progress =
+        _questions.isEmpty ? 0 : (_currentIndex + 1) / _questions.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2FBFA),
       appBar: AppBar(
-        title: const Text("Pre-Admission Test", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          "Pre-Admission Test",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: const Color(0xFF0F9D58),
@@ -280,65 +288,118 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 进度条
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: Colors.grey.shade300,
-                  color: const Color(0xFF0F9D58),
-                  minHeight: 12,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // 题目展示区
-              Expanded(
-                child: _buildQuestionPage(),
-              ),
-            ],
-          ),
+          child: _started ? _buildQuestionUI(progress) : _buildStartUI(),
         ),
       ),
     );
   }
 
-  // 构建单选题页面
-  Widget _buildQuestionPage() {
-    final currentQ = _questions[_currentIndex];
+  // ✅ START PAGE (NEW)
+  Widget _buildStartUI() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          currentQ['theme'],
-          style: const TextStyle(fontSize: 14, color: Colors.blueGrey, fontWeight: FontWeight.bold),
+        const Text(
+          "Before you start",
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 12),
-        Text(
-          currentQ['question'],
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+        const SizedBox(height: 20),
+
+        TextField(
+          decoration: const InputDecoration(labelText: "Student Name"),
+          onChanged: (v) => _studentName = v,
         ),
-        const SizedBox(height: 40),
-        ...((currentQ['options'] as List).map((opt) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: ElevatedButton(
-              onPressed: () => _answerQuestion(opt['tags']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.black87,
-                elevation: 2,
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+
+        const SizedBox(height: 20),
+
+        TextField(
+          decoration:
+              const InputDecoration(labelText: "Emergency Contact"),
+          onChanged: (v) => _emergencyContact = v,
+        ),
+
+        const SizedBox(height: 30),
+
+        ElevatedButton(
+          onPressed: () {
+            if (_studentName.isEmpty || _emergencyContact.isEmpty) return;
+
+            setState(() {
+              _started = true;
+            });
+          },
+          child: const Text("Start Test"),
+        ),
+      ],
+    );
+  }
+
+  // ✅ QUESTION UI (YOUR ORIGINAL UI MOVED HERE)
+  Widget _buildQuestionUI(double progress) {
+    final currentQ = _questions[_currentIndex];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.grey.shade300,
+            color: const Color(0xFF0F9D58),
+            minHeight: 12,
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                currentQ['theme'],
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.blueGrey,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              child: Text(opt['text'], style: const TextStyle(fontSize: 16, height: 1.4)),
-            ),
-          );
-        })),
+              const SizedBox(height: 12),
+
+              Text(
+                currentQ['question'],
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              ...((currentQ['options'] as List).map((opt) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ElevatedButton(
+                    onPressed: () => _answerQuestion(opt['tags']),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black87,
+                      elevation: 2,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 20, horizontal: 20),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(opt['text'],
+                        style: const TextStyle(fontSize: 16)),
+                  ),
+                );
+              })),
+            ],
+          ),
+        ),
       ],
     );
   }
