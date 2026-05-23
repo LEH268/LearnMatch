@@ -442,9 +442,14 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
               name: d['name'] ?? 'Unknown',
               emergencyContact: d['emergencyContact'] ?? '',
               className: d['className'] ?? 'Unassigned',
-              varkScores: Map<String, int>.from(d['varkScores'] ?? {}),
-              personalityScores:
-                  Map<String, int>.from(d['personalityScores'] ?? {}), grades: '', basicInfo: '', specialConditions: '', aiCognitiveAnalysis: '', aiAdaptivePath: '',
+              grades: d['grades'] ?? '',
+              basicInfo: d['basicInfo'] ?? '',
+              specialConditions: d['specialConditions'] ?? '',
+              aiCognitiveAnalysis: d['aiCognitiveAnalysis'] ?? '',
+              aiAdaptivePath: d['aiAdaptivePath'] ?? '',
+                varkScores: Map<String, int>.from(d['varkScores'] ?? {}),
+                personalityScores:
+                  Map<String, int>.from(d['personalityScores'] ?? {}),
             );
           }).toList();
 
