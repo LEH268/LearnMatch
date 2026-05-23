@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pre_admission_test.dart';
 import 'class_network_page.dart'; // Added the import for the new Class Network Page
+import 'assessment_link_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -78,7 +79,7 @@ class HomePage extends StatelessWidget {
                 accentColor: const Color(0xFF0F9D58),
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const PreAdmissionTestPage()),
+                  MaterialPageRoute(builder: (context) => const AssessmentLinkPage()),
                 ),
               ),
               const SizedBox(height: 20),
