@@ -2,21 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/placement_engine.dart';
 
-// ── Colour per VARK class ──────────────────────────
-const Map<String, Color> _classColor = {
-  'Class V': Color(0xFF1565C0),
-  'Class A': Color(0xFF2E7D32),
-  'Class R': Color(0xFF6A1B9A),
-  'Class K': Color(0xFFE65100),
-};
-
-const Map<String, IconData> _classIcon = {
-  'Class V': Icons.visibility_rounded,
-  'Class A': Icons.hearing_rounded,
-  'Class R': Icons.menu_book_rounded,
-  'Class K': Icons.directions_run_rounded,
-};
-
 // ══════════════════════════════════════════════════
 // CLASS PLACEMENT PAGE
 // ══════════════════════════════════════════════════
@@ -32,18 +17,15 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
   final PlacementEngine _engine = PlacementEngine();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // States: idle | creating_classes | previewing | confirming | done | error
   String _state = 'idle';
   String _errorMsg = '';
 
   List<PlacementResult> _previewResults = [];
-
-  // ── Existing classes from Firestore ───────────────
   List<Map<String, dynamic>> _existingClasses = [];
   bool _loadingClasses = true;
 
-  // ── New class creation ────────────────────────────
   final TextEditingController _classNameController = TextEditingController();
+  String _selectedTargetVark = 'V'; // 默认目标群体是 V
 
   @override
   void initState() {
@@ -68,7 +50,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
             'id': d.id,
             'className': data['className'] ?? d.id,
             'studentCount': data['studentCount'] ?? 0,
-            'learningStyle': data['learningStyle'] ?? '',
+            'targetVARK': data['targetVARK'] ?? 'V', // 获取偏好
           };
         }).toList();
         _loadingClasses = false;
@@ -78,12 +60,13 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     }
   }
 
-  // ── Create a new class ────────────────────────────
+  // ── Create a new class with target VARK ─────────────
   Future<void> _createClass(String className) async {
     if (className.trim().isEmpty) return;
     try {
       await _db.collection('classes').doc(className.trim()).set({
         'className': className.trim(),
+        'targetVARK': _selectedTargetVark, // 存储目标VARK群体
         'studentCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -106,7 +89,6 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     }
   }
 
-  // ── Delete a class ────────────────────────────────
   Future<void> _deleteClass(String classId, String className) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -133,7 +115,6 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     }
   }
 
-  // Group results by class for display
   Map<String, List<PlacementResult>> get _grouped {
     final map = <String, List<PlacementResult>>{};
     for (final r in _previewResults) {
@@ -142,7 +123,6 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     return map;
   }
 
-  // ── Step 1: Preview ────────────────────────────
   Future<void> _runPreview() async {
     if (_existingClasses.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -169,7 +149,6 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     }
   }
 
-  // ── Step 2: Confirm & Save ─────────────────────
   Future<void> _confirmPlacement() async {
     setState(() => _state = 'confirming');
     try {
@@ -183,10 +162,6 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
       });
     }
   }
-
-  // ══════════════════════════════════════════════
-  // BUILD
-  // ══════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
@@ -212,87 +187,100 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
 
   Widget _buildBody() {
     switch (_state) {
-      case 'idle':
-        return _buildIdleView();
+      case 'idle': return _buildIdleView();
       case 'previewing':
-      case 'confirming':
-        return _buildLoadingView();
-      case 'preview_ready':
-        return _buildPreviewView();
-      case 'done':
-        return _buildDoneView();
-      case 'error':
-        return _buildErrorView();
-      default:
-        return _buildIdleView();
+      case 'confirming': return _buildLoadingView();
+      case 'preview_ready': return _buildPreviewView();
+      case 'done': return _buildDoneView();
+      case 'error': return _buildErrorView();
+      default: return _buildIdleView();
     }
   }
 
-  // ── Idle (Main screen with class management) ───
   Widget _buildIdleView() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Class Placement',
+          'Class Placement Settings',
           style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 6),
         const Text(
-          'First create your classes, then run the AI placement to assign students based on VARK scores and personality.',
+          'Create classes and configure their target VARK learning style before running the AI placement.',
           style: TextStyle(fontSize: 14, color: Colors.blueGrey, height: 1.5),
         ),
         const SizedBox(height: 24),
 
-        // ── Step 1: Create Classes ───────────────
-        _buildSectionHeader('Step 1: Create Classes', Icons.add_circle_outline_rounded, const Color(0xFF0F9D58)),
+        _buildSectionHeader('Step 1: Setup Classes', Icons.add_circle_outline_rounded, const Color(0xFF0F9D58)),
         const SizedBox(height: 12),
 
-        // Create class input
+        // 班级创建输入框和类型下拉
         Row(
           children: [
             Expanded(
+              flex: 3,
               child: TextField(
                 controller: _classNameController,
                 decoration: InputDecoration(
-                  hintText: 'e.g. Class A, Kelas Bijak...',
-                  hintStyle: const TextStyle(color: Colors.blueGrey),
+                  hintText: 'Class Name (e.g. Year 1 Alpha)',
+                  hintStyle: const TextStyle(color: Colors.blueGrey, fontSize: 13),
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFF0F9D58)),
                   ),
                 ),
                 onSubmitted: (v) => _createClass(v),
               ),
             ),
-            const SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: () => _createClass(_classNameController.text),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F9D58),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: DropdownButtonFormField<String>(
+                value: _selectedTargetVark,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                ),
+                style: const TextStyle(fontSize: 13, color: Colors.black87),
+                items: const [
+                  DropdownMenuItem(value: 'V', child: Text('Target: V')),
+                  DropdownMenuItem(value: 'A', child: Text('Target: A')),
+                  DropdownMenuItem(value: 'R', child: Text('Target: R')),
+                  DropdownMenuItem(value: 'K', child: Text('Target: K')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _selectedTargetVark = val);
+                },
               ),
-              child: const Text('Create', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => _createClass(_classNameController.text),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F9D58),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('Add Class', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
-        // Existing classes list
         if (_loadingClasses)
           const Center(child: CircularProgressIndicator(color: Color(0xFF0F9D58)))
         else if (_existingClasses.isEmpty)
@@ -303,7 +291,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${_existingClasses.length} class(es) created',
+                  '${_existingClasses.length} class(es) configured',
                   style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
                 ),
                 const SizedBox(height: 8),
@@ -321,7 +309,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
                   child: ElevatedButton.icon(
                     onPressed: _runPreview,
                     icon: const Icon(Icons.preview_rounded),
-                    label: const Text('Preview Placement',
+                    label: const Text('Preview AI Placement',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepPurple,
@@ -370,7 +358,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'No classes yet. Create at least one class above before running placement.',
+              'No classes yet. Add classes and set their target VARK style before running placement.',
               style: TextStyle(color: Colors.black87, fontSize: 13, height: 1.4),
             ),
           ),
@@ -382,12 +370,16 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
   Widget _buildClassTile(Map<String, dynamic> classData) {
     final name = classData['className'] as String;
     final count = classData['studentCount'] as int;
-    final style = classData['learningStyle'] as String;
+    final target = classData['targetVARK'] as String;
 
-    // Pick color based on known VARK class names or just cycle
-    Color color = const Color(0xFF0F9D58);
-    if (_classColor.containsKey(name)) {
-      color = _classColor[name]!;
+    Color color;
+    IconData icon;
+    switch(target) {
+      case 'V': color = const Color(0xFF1565C0); icon = Icons.visibility_rounded; break;
+      case 'A': color = const Color(0xFF2E7D32); icon = Icons.hearing_rounded; break;
+      case 'R': color = const Color(0xFF6A1B9A); icon = Icons.menu_book_rounded; break;
+      case 'K': color = const Color(0xFFE65100); icon = Icons.directions_run_rounded; break;
+      default: color = Colors.blueGrey; icon = Icons.class_rounded; break;
     }
 
     return Container(
@@ -396,14 +388,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -413,26 +398,15 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
               color: color.withOpacity(0.10),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              _classIcon[name] ?? Icons.class_rounded,
-              color: color,
-              size: 20,
-            ),
+            child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                      fontSize: 14,
-                    )),
-                if (style.isNotEmpty)
-                  Text(style,
-                      style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 15)),
+                Text('Target: $target Style', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
               ],
             ),
           ),
@@ -442,15 +416,9 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
               color: color.withOpacity(0.10),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(
-              '$count students',
-              style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold),
-            ),
+            child: Text('$count stds', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
             onPressed: () => _deleteClass(classData['id'], name),
@@ -460,7 +428,6 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     );
   }
 
-  // ── Loading ────────────────────────────────────
   Widget _buildLoadingView() {
     final msg = _state == 'confirming'
         ? 'Saving placement results...'
@@ -471,34 +438,26 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
         children: [
           const CircularProgressIndicator(color: Color(0xFF0F9D58)),
           const SizedBox(height: 24),
-          Text(msg,
-              style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.blueGrey,
-                  fontWeight: FontWeight.w500)),
+          Text(msg, style: const TextStyle(fontSize: 16, color: Colors.blueGrey, fontWeight: FontWeight.w500)),
         ],
       ),
     );
   }
 
-  // ── Preview Ready ──────────────────────────────
   Widget _buildPreviewView() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Text('Placement Preview',
-                style:
-                    TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            const Text('Placement Preview', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
             const Spacer(),
-            Text('${_previewResults.length} students',
-                style: const TextStyle(color: Colors.blueGrey)),
+            Text('${_previewResults.length} students', style: const TextStyle(color: Colors.blueGrey)),
           ],
         ),
         const SizedBox(height: 6),
         const Text(
-          'Review the proposed placement below. Tap Confirm to save.',
+          'Review the proposed placement based on target VARK. Tap Confirm to save.',
           style: TextStyle(color: Colors.blueGrey, fontSize: 13),
         ),
         const SizedBox(height: 20),
@@ -506,10 +465,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
         Expanded(
           child: ListView(
             children: _grouped.entries.map((entry) {
-              final color = _classColor[entry.key] ?? Colors.grey;
-              final icon = _classIcon[entry.key] ?? Icons.group;
-              return _buildClassPreviewCard(
-                  entry.key, entry.value, color, icon);
+              return _buildClassPreviewCard(entry.key, entry.value);
             }).toList(),
           ),
         ),
@@ -523,8 +479,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
                 onPressed: () => setState(() => _state = 'idle'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 child: const Text('Cancel'),
               ),
@@ -535,14 +490,12 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
               child: ElevatedButton.icon(
                 onPressed: _confirmPlacement,
                 icon: const Icon(Icons.check_circle_rounded),
-                label: const Text('Confirm Placement',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text('Confirm Placement', style: TextStyle(fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0F9D58),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
             ),
@@ -552,23 +505,18 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     );
   }
 
-  Widget _buildClassPreviewCard(
-    String className,
-    List<PlacementResult> students,
-    Color color,
-    IconData icon,
-  ) {
+  Widget _buildClassPreviewCard(String className, List<PlacementResult> students) {
+    Color color = Colors.blueGrey;
+    if (className == 'Unassigned') color = Colors.orange;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withOpacity(0.3)),
         boxShadow: [
-          BoxShadow(
-              color: color.withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4)),
+          BoxShadow(color: color.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -577,32 +525,15 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: color.withOpacity(0.08),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Row(
               children: [
-                Icon(icon, color: color),
+                Icon(Icons.class_rounded, color: color),
                 const SizedBox(width: 10),
-                Text(className,
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                        fontSize: 16)),
+                Text(className, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 16)),
                 const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text('${students.length} students',
-                      style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12)),
-                ),
+                Text('${students.length} students', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
               ],
             ),
           ),
@@ -610,43 +541,19 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
                 leading: CircleAvatar(
                   backgroundColor: color.withOpacity(0.10),
                   child: Text(
-                    s.studentName.isNotEmpty
-                        ? s.studentName[0].toUpperCase()
-                        : '?',
-                    style: TextStyle(
-                        color: color, fontWeight: FontWeight.bold),
+                    s.studentName.isNotEmpty ? s.studentName[0].toUpperCase() : '?',
+                    style: TextStyle(color: color, fontWeight: FontWeight.bold),
                   ),
                 ),
-                title: Text(s.studentName,
-                    style:
-                        const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                  'V:${s.varkScores['V'] ?? 0}  '
-                  'A:${s.varkScores['A'] ?? 0}  '
-                  'R:${s.varkScores['R'] ?? 0}  '
-                  'K:${s.varkScores['K'] ?? 0}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.10),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(s.dominantStyle,
-                      style: TextStyle(
-                          color: color,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold)),
-                ),
+                title: Text(s.studentName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text('Score: V:${s.varkScores['V']} A:${s.varkScores['A']} R:${s.varkScores['R']} K:${s.varkScores['K']}', style: const TextStyle(fontSize: 12)),
+                trailing: Text(s.dominantStyle, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
               )),
         ],
       ),
     );
   }
 
-  // ── Done ───────────────────────────────────────
   Widget _buildDoneView() {
     return Center(
       child: Column(
@@ -654,23 +561,16 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
         children: [
           Container(
             padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F9D58).withOpacity(0.10),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.check_circle_rounded,
-                color: Color(0xFF0F9D58), size: 72),
+            decoration: BoxDecoration(color: const Color(0xFF0F9D58).withOpacity(0.10), shape: BoxShape.circle),
+            child: const Icon(Icons.check_circle_rounded, color: Color(0xFF0F9D58), size: 72),
           ),
           const SizedBox(height: 28),
-          const Text('Placement Complete! 🎉',
-              style:
-                  TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+          const Text('Placement Complete! 🎉', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
           const SizedBox(height: 12),
           Text(
             '${_previewResults.length} students have been assigned to their classes.\nFirestore has been updated.',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-                color: Colors.blueGrey, fontSize: 15, height: 1.5),
+            style: const TextStyle(color: Colors.blueGrey, fontSize: 15, height: 1.5),
           ),
           const SizedBox(height: 40),
           SizedBox(
@@ -681,14 +581,12 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
                 _loadExistingClasses();
               },
               icon: const Icon(Icons.arrow_back_rounded),
-              label: const Text('Back to Classes',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text('Back to Classes', style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F9D58),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               ),
             ),
           ),
@@ -697,30 +595,23 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     );
   }
 
-  // ── Error ──────────────────────────────────────
   Widget _buildErrorView() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline_rounded,
-              color: Colors.redAccent, size: 64),
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
           const SizedBox(height: 20),
-          const Text('Something went wrong',
-              style:
-                  TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text('Something went wrong', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          Text(_errorMsg,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.blueGrey)),
+          Text(_errorMsg, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey)),
           const SizedBox(height: 32),
           ElevatedButton(
             onPressed: () => setState(() => _state = 'idle'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0F9D58),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             child: const Text('Try Again'),
           ),

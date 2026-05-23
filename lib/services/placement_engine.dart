@@ -49,9 +49,7 @@ class PlacementEngine {
     return dominant;
   }
 
-  // ── Assign student to best matching class from admin-created classes ──
-  // Logic: match dominant VARK letter to class name if possible,
-  // otherwise distribute evenly across available classes.
+  // ── Assign student to best matching class based on targetVARK ──
   static String _assignToClass(
     String dominant,
     List<Map<String, dynamic>> classes,
@@ -59,18 +57,19 @@ class PlacementEngine {
   ) {
     if (classes.isEmpty) return 'Unassigned';
 
-    // Try to find a class name containing the dominant VARK letter (e.g. "Class V", "Kelas A")
-    for (final c in classes) {
-      final name = (c['className'] as String).toUpperCase();
-      if (name.contains(' $dominant') || name.endsWith(dominant) || name.startsWith(dominant)) {
-        return c['className'] as String;
-      }
+    // 筛选出所有与学生主要学习风格（Dominant）相匹配的班级
+    final matchingClasses = classes.where((c) => c['targetVARK'] == dominant).toList();
+
+    // 如果没有找到匹配的班级，暂时列为未分配（或者你可以在此修改为随机分配）
+    if (matchingClasses.isEmpty) {
+      return 'Unassigned';
     }
 
-    // Fallback: assign to class with fewest students (load balancing)
-    String minClass = classes.first['className'] as String;
+    // 负载均衡：如果有多于一个班级适合（比如 Year1 和 Year2 都有 V 班），分配给人数最少的那个
+    String minClass = matchingClasses.first['className'] as String;
     int minCount = classCounts[minClass] ?? 0;
-    for (final c in classes) {
+    
+    for (final c in matchingClasses) {
       final name = c['className'] as String;
       final count = classCounts[name] ?? 0;
       if (count < minCount) {
@@ -96,7 +95,10 @@ class PlacementEngine {
       final varkScores = Map<String, int>.from(varkRaw);
       final dominant = getDominantStyle(varkScores);
       final className = _assignToClass(dominant, existingClasses, classCounts);
-      classCounts[className] = (classCounts[className] ?? 0) + 1;
+      
+      if (className != 'Unassigned') {
+        classCounts[className] = (classCounts[className] ?? 0) + 1;
+      }
 
       results.add(PlacementResult(
         studentId: doc.id,
@@ -128,8 +130,11 @@ class PlacementEngine {
       final varkScores = Map<String, int>.from(varkRaw);
       final dominant = getDominantStyle(varkScores);
       final className = _assignToClass(dominant, existingClasses, classCounts);
-      classCounts[className] = (classCounts[className] ?? 0) + 1;
-      classStudentMap.putIfAbsent(className, () => []).add(doc.id);
+      
+      if (className != 'Unassigned') {
+        classCounts[className] = (classCounts[className] ?? 0) + 1;
+        classStudentMap.putIfAbsent(className, () => []).add(doc.id);
+      }
 
       batch.update(doc.reference, {
         'className': className,

@@ -54,6 +54,10 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
   List<Teacher> _teachers = [];
   List<ClassGroup> _classes = [];
 
+  // User-dragged positions, keyed by node id. Survives Firestore refreshes
+  // so manually-arranged layouts don't snap back when data updates.
+  final Map<String, Offset> _positionOverrides = {};
+
   @override
   void initState() {
     super.initState();
@@ -80,6 +84,14 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
     List<ClassGroup> classes,
   ) {
     _allNodes = GraphRepository.buildNodes(students, teachers, classes);
+    // Re-apply any positions the user has dragged. Stale overrides (for
+    // nodes that no longer exist) are pruned so the map can't grow forever.
+    final liveIds = _allNodes.map((n) => n.id).toSet();
+    _positionOverrides.removeWhere((id, _) => !liveIds.contains(id));
+    for (final n in _allNodes) {
+      final override = _positionOverrides[n.id];
+      if (override != null) n.position = override;
+    }
     _allEdges = GraphRepository.buildEdges(_allNodes);
     _filterVisibleElements();
   }
@@ -960,7 +972,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                 painter:
                     EdgePainter(edges: visibleEdges, nodeSize: nodeSize),
               ),
-              // NODES (breath-floating)
+              // NODES (breath-floating + draggable)
               ...visibleNodes.map((node) {
                 final floating = sin(
                         _breathController.value * pi * 2 + node.randomPhase) *
@@ -968,9 +980,25 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                 return Positioned(
                   left: node.position.dx,
                   top: node.position.dy + floating,
-                  child: GestureDetector(
-                    onTap: () => _handleNodeTap(node),
-                    child: _buildBeautifulNodeWidget(node),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: GestureDetector(
+                      // A short press still opens / focuses / expands.
+                      onTap: () => _handleNodeTap(node),
+                      // A drag moves the node. Updating node.position in
+                      // place is enough — EdgePainter reads it directly,
+                      // so edges follow in real time.
+                      onPanUpdate: (details) {
+                        setState(() {
+                          node.position = Offset(
+                            node.position.dx + details.delta.dx,
+                            node.position.dy + details.delta.dy,
+                          );
+                          _positionOverrides[node.id] = node.position;
+                        });
+                      },
+                      child: _buildBeautifulNodeWidget(node),
+                    ),
                   ),
                 );
               }),

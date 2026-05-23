@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../services/placement_engine.dart';
 import 'pre_admission_report.dart';
+import 'class_placement_page.dart'; // 引入班级配置页面
 
 class AssessmentLinkPage extends StatefulWidget {
   const AssessmentLinkPage({super.key});
@@ -16,57 +16,9 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
   static const String _assessmentLink =
       "https://learnmatch-2b5c4.web.app/#/pre-admission-test";
 
-  final PlacementEngine _engine = PlacementEngine();
-  bool _isPlacing = false;
-
-  // ── One-click placement ────────────────────────
-  Future<void> _runPlacement() async {
-    setState(() => _isPlacing = true);
-    try {
-        // Load existing classes from Firestore to pass into the placement engine
-        final classSnap = await FirebaseFirestore.instance.collection('classes').get();
-        final existingClasses = classSnap.docs
-          .map((d) => {'className': d.data()['className'] ?? d.id, ...d.data()})
-          .toList();
-
-        final results = await _engine.runPlacement(existingClasses);
-      if (!mounted) return;
-
-      // Show summary dialog
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Placement Complete 🎉',
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Text(
-            '${results.length} students have been assigned to their classes.',
-            style: const TextStyle(fontSize: 15),
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F9D58),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Placement failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isPlacing = false);
-    }
-  }
+  // 搜索与筛选状态
+  String _searchQuery = '';
+  String _selectedFilter = 'All';
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +37,6 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // ── Title ──────────────────────────────
             const Text(
               "Share Assessment with Students",
@@ -187,22 +138,22 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
 
                   const SizedBox(height: 12),
 
-                  // ── One-click placement button ──
+                  // ── 去分班设置页面的按钮 ──
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _isPlacing ? null : _runPlacement,
-                      icon: _isPlacing
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.auto_awesome_rounded),
-                      label: Text(
-                        _isPlacing ? "Placing Students..." : "One-Click Class Placement",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      onPressed: () {
+                        // 跳转到配置和分班页面
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ClassPlacementPage()),
+                        );
+                      },
+                      icon: const Icon(Icons.settings_suggest_rounded),
+                      label: const Text(
+                        "Configure & Run Placement",
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1565C0),
@@ -228,10 +179,26 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
                 color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 6),
-            const Text(
-              "Tap any student to view their full learning profile report.",
-              style: TextStyle(fontSize: 13, color: Colors.blueGrey),
+            const SizedBox(height: 16),
+
+            // 搜索框
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Search by student name...',
+                prefixIcon: const Icon(Icons.search, color: Colors.blueGrey),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
             ),
             const SizedBox(height: 16),
 
@@ -252,131 +219,195 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
 
                 final docs = snapshot.data!.docs;
 
-                if (docs.isEmpty) {
-                  return Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Column(
-                      children: [
-                        Icon(Icons.inbox_rounded,
-                            size: 48, color: Colors.blueGrey),
-                        SizedBox(height: 12),
-                        Text(
-                          "No submissions yet.\nShare the link above to get started!",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.blueGrey),
-                        ),
-                      ],
-                    ),
-                  );
+                // 提取所有可用的班级用于生成 Filter 标签
+                final classSet = <String>{};
+                for (var doc in docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final cName = data['className'] ?? 'Unassigned';
+                  if (cName != 'Unassigned') classSet.add(cName);
                 }
+                final classList = classSet.toList()..sort();
+                final filterOptions = ['All', 'Unassigned', ...classList];
+
+                // 过滤和搜索逻辑
+                final filteredDocs = docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final name = (data['name'] ?? '').toString().toLowerCase();
+                  final className = data['className'] ?? 'Unassigned';
+
+                  // Search match
+                  bool matchesSearch =
+                      name.contains(_searchQuery.toLowerCase());
+
+                  // Filter match
+                  bool matchesFilter = true;
+                  if (_selectedFilter == 'Unassigned') {
+                    matchesFilter = className == 'Unassigned';
+                  } else if (_selectedFilter != 'All') {
+                    matchesFilter = className == _selectedFilter;
+                  }
+
+                  return matchesSearch && matchesFilter;
+                }).toList();
 
                 return Column(
-                  children: docs.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final name = data['name'] ?? 'Unknown';
-                    final className = data['className'] ?? 'Unassigned';
-                    final varkRaw =
-                        Map<String, int>.from(data['varkScores'] ?? {});
-                    final pRaw = Map<String, int>.from(
-                        data['personalityScores'] ?? {});
-
-                    // Dominant VARK
-                    String dominant = '-';
-                    if (varkRaw.isNotEmpty) {
-                      dominant = varkRaw.entries
-                          .reduce((a, b) => a.value > b.value ? a : b)
-                          .key;
-                    }
-
-                    final classColor = _classColor(className);
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 10),
-                        leading: CircleAvatar(
-                          backgroundColor:
-                              classColor.withOpacity(0.12),
-                          child: Text(
-                            name.isNotEmpty
-                                ? name[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                                color: classColor,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        title: Text(name,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold)),
-                        subtitle: Text(
-                          'Style: $dominant  •  Class: $className',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        trailing: const Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 14,
-                            color: Colors.blueGrey),
-                        onTap: () {
-                          // Build pScores map expected by ReportPage
-                          final pScores = {
-                            'S': pRaw['Structured'] ?? 0,
-                            'E': pRaw['Exploratory'] ?? 0,
-                            'I': pRaw['Introvert'] ?? 0,
-                            'X': pRaw['Extrovert'] ?? 0,
-                            'P': pRaw['Impulsivity'] ?? 0,
-                            'R': pRaw['Reflectivity'] ?? 0,
-                          };
-
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ReportPage(
-                                studentName: name,
-                                varkScores: varkRaw,
-                                pScores: pScores,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 横向滚动的 Filter 标签
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: filterOptions.map((filter) {
+                          final isSelected = _selectedFilter == filter;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(filter),
+                              selected: isSelected,
+                              selectedColor: const Color(0xFF0F9D58).withOpacity(0.2),
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? const Color(0xFF0F9D58)
+                                    : Colors.blueGrey,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
+                              onSelected: (selected) {
+                                setState(() {
+                                  _selectedFilter = filter;
+                                });
+                              },
                             ),
                           );
-                        },
+                        }).toList(),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (filteredDocs.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Column(
+                          children: [
+                            Icon(Icons.inbox_rounded,
+                                size: 48, color: Colors.blueGrey),
+                            SizedBox(height: 12),
+                            Text(
+                              "No students found matching your criteria.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.blueGrey),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Column(
+                        children: filteredDocs.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final name = data['name'] ?? 'Unknown';
+                          final className = data['className'] ?? 'Unassigned';
+                          final varkRaw =
+                              Map<String, int>.from(data['varkScores'] ?? {});
+                          final pRaw = Map<String, int>.from(
+                              data['personalityScores'] ?? {});
+
+                          String dominant = '-';
+                          if (varkRaw.isNotEmpty) {
+                            dominant = varkRaw.entries
+                                .reduce((a, b) => a.value > b.value ? a : b)
+                                .key;
+                          }
+
+                          final isUnassigned = className == 'Unassigned';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: isUnassigned
+                                  ? Border.all(color: Colors.orange.shade200)
+                                  : null,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 10),
+                              leading: CircleAvatar(
+                                backgroundColor: isUnassigned
+                                    ? Colors.orange.shade50
+                                    : Colors.blue.shade50,
+                                child: Text(
+                                  name.isNotEmpty
+                                      ? name[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                      color: isUnassigned
+                                          ? Colors.orange
+                                          : Colors.blue,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              title: Text(name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                              subtitle: Text(
+                                'Style: $dominant  •  Class: $className',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: isUnassigned
+                                        ? Colors.orange.shade800
+                                        : Colors.blueGrey),
+                              ),
+                              trailing: const Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 14,
+                                  color: Colors.blueGrey),
+                              onTap: () {
+                                final pScores = {
+                                  'S': pRaw['Structured'] ?? 0,
+                                  'E': pRaw['Exploratory'] ?? 0,
+                                  'I': pRaw['Introvert'] ?? 0,
+                                  'X': pRaw['Extrovert'] ?? 0,
+                                  'P': pRaw['Impulsivity'] ?? 0,
+                                  'R': pRaw['Reflectivity'] ?? 0,
+                                };
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ReportPage(
+                                      studentName: name,
+                                      varkScores: varkRaw,
+                                      pScores: pScores,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                  ],
                 );
               },
             ),
-
             const SizedBox(height: 32),
           ],
         ),
       ),
     );
-  }
-
-  Color _classColor(String className) {
-    switch (className) {
-      case 'Class V': return const Color(0xFF1565C0);
-      case 'Class A': return const Color(0xFF2E7D32);
-      case 'Class R': return const Color(0xFF6A1B9A);
-      case 'Class K': return const Color(0xFFE65100);
-      default:        return Colors.blueGrey;
-    }
   }
 }
