@@ -12,18 +12,18 @@ class ReportPage extends StatelessWidget {
     required this.pScores,
   });
 
+
   int _calcPercent(int score, int total) =>
       total == 0 ? 0 : ((score / total) * 100).round();
 
   @override
   Widget build(BuildContext context) {
-    final int totalVark =
-        varkScores.values.fold(0, (a, b) => a + b);
+    int totalVark = varkScores.values.reduce((a, b) => a + b);
 
-    final int pV = _calcPercent(varkScores['V'] ?? 0, totalVark);
-    final int pA = _calcPercent(varkScores['A'] ?? 0, totalVark);
-    final int pR = _calcPercent(varkScores['R'] ?? 0, totalVark);
-    final int pK = _calcPercent(varkScores['K'] ?? 0, totalVark);
+    int pV = _calcPercent(varkScores['V']!, totalVark);
+    int pA = _calcPercent(varkScores['A']!, totalVark);
+    int pR = _calcPercent(varkScores['R']!, totalVark);
+    int pK = _calcPercent(varkScores['K']!, totalVark);
 
     final int totalSE = (pScores['S'] ?? 0) + (pScores['E'] ?? 0);
     final int pS   = _calcPercent(pScores['S'] ?? 0, totalSE);
@@ -33,9 +33,9 @@ class ReportPage extends StatelessWidget {
     final int pI   = _calcPercent(pScores['I'] ?? 0, totalIX);
     final int pX   = _calcPercent(pScores['X'] ?? 0, totalIX);
 
-    final int totalPR = (pScores['P'] ?? 0) + (pScores['R'] ?? 0);
-    final int pP   = _calcPercent(pScores['P'] ?? 0, totalPR);
-    final int pRef = _calcPercent(pScores['R'] ?? 0, totalPR);
+    int totalPR = pScores['P']! + pScores['R']!;
+    int pP = _calcPercent(pScores['P']!, totalPR);
+    int pRef = _calcPercent(pScores['R']!, totalPR);
 
     // Dominant VARK
     String topVark = 'V';

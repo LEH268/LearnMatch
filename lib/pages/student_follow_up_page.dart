@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 // ==========================================
 // 1. Data Model (Simulating Database Records)
@@ -30,6 +31,10 @@ class StudentFollowUpPage extends StatefulWidget {
 }
 
 class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
+
+  final String evaluationLink =
+    "https://learnmatch-2b5c4.web.app/#/student-evaluation";
+
   // Simulated database with detailed answers for students who submitted the form
   final List<StudentRecord> _allStudents = [
     StudentRecord(id: 'S01', name: 'Alice Smith', hasSubmittedForm: true, evaluationScore: 23, detailedAnswers: [5, 4, 5, 4, 5]),
@@ -92,6 +97,127 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
               ),
             ),
             const SizedBox(height: 20),
+
+                        // Evaluation Form Link Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.deepPurple.withOpacity(0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.link_rounded,
+                        color: Colors.deepPurple,
+                      ),
+
+                      SizedBox(width: 8),
+
+                      Text(
+                        "Student Evaluation Form Link",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    "Send this evaluation link to students so they can complete their year-end self-evaluation form online. Responses will be synced into the teacher dashboard for AI-assisted re-streaming analysis.\n",
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Colors.blueGrey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF6F2FF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.deepPurple.shade100,
+                      ),
+                    ),
+
+                    child: SelectableText(
+                      evaluationLink,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  SizedBox(
+                    width: double.infinity,
+
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+
+                        await Clipboard.setData(
+                          ClipboardData(text: evaluationLink),
+                        );
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              "Evaluation link copied successfully!",
+                            ),
+                          ),
+                        );
+                      },
+
+                      icon: const Icon(Icons.copy_rounded),
+
+                      label: const Text(
+                        "Copy Link",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             Text(
               'Class Roster (${_filteredStudents.length})',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
