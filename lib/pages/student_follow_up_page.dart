@@ -1,24 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:learn_match/models/student_record.dart';
+import 'package:learn_match/ai/fake_database.dart';
 
-// ==========================================
-// 1. Data Model (Simulating Database Records)
-// ==========================================
-class StudentRecord {
-  final String id;
-  final String name;
-  final bool hasSubmittedForm;
-  final int? evaluationScore;
-  final List<int>? detailedAnswers; // NEW: Added to store specific answers for the 5 questions
-
-  StudentRecord({
-    required this.id,
-    required this.name,
-    required this.hasSubmittedForm,
-    this.evaluationScore,
-    this.detailedAnswers,
-  });
-}
 
 // ==========================================
 // 2. Student List & Filter Page (Entry Point)
@@ -35,22 +19,33 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
   final String evaluationLink =
     "https://learnmatch-2b5c4.web.app/#/student-evaluation";
 
-  // Simulated database with detailed answers for students who submitted the form
-  final List<StudentRecord> _allStudents = [
-    StudentRecord(id: 'S01', name: 'Alice Smith', hasSubmittedForm: true, evaluationScore: 23, detailedAnswers: [5, 4, 5, 4, 5]),
-    StudentRecord(id: 'S02', name: 'Bob Johnson', hasSubmittedForm: false),
-    StudentRecord(id: 'S03', name: 'Charlie Brown', hasSubmittedForm: true, evaluationScore: 15, detailedAnswers: [3, 3, 3, 3, 3]),
-    StudentRecord(id: 'S04', name: 'Diana Prince', hasSubmittedForm: true, evaluationScore: 20, detailedAnswers: [4, 4, 5, 3, 4]),
-    StudentRecord(id: 'S05', name: 'Ethan Hunt', hasSubmittedForm: false),
-  ];
+  List<StudentRecord> get _allStudents => FakeDatabase.students;
 
   List<StudentRecord> _filteredStudents = [];
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadStudents();
+  }
+
+  void _loadStudents() {
+    setState(() {
+      _filteredStudents = FakeDatabase.students;
+    });
+  }
+
+  @override
   void initState() {
     super.initState();
-    _filteredStudents = _allStudents;
+    _loadStudents();
+  }
+
+  void _refreshList() {
+    setState(() {
+      _filteredStudents = FakeDatabase.students;
+    });
   }
 
   void _filterStudents(String query) {
@@ -250,13 +245,19 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
                       ),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                       onTap: () {
-                        // Navigate to specific student's detail page
+                        final latestStudent = FakeDatabase.students.firstWhere(
+                          (s) => s.id == student.id,
+                          orElse: () => student,
+                        );
+
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => StudentDetailPage(student: student),
+                            builder: (context) => StudentDetailPage(student: latestStudent),
                           ),
                         );
+
+                        setState((){});
                       },
                     ),
                   );
@@ -380,7 +381,12 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               const Divider(),
               const SizedBox(height: 10),
               ...List.generate(_formQuestions.length, (index) {
-                int score = _fetchedDetailedAnswers.isNotEmpty ? _fetchedDetailedAnswers[index] : 0;
+                int score = 0;
+
+                if (index < _fetchedDetailedAnswers.length) {
+                  score = _fetchedDetailedAnswers[index];
+                }
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
                   child: Column(
