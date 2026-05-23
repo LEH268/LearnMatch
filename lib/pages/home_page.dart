@@ -1,214 +1,139 @@
 import 'package:flutter/material.dart';
-
 import 'special_request_link_page.dart';
 import 'pre_admission_test.dart';
-import 'class_network_page.dart';
+import 'class_network_page.dart'; 
 import 'assessment_link_page.dart';
 import 'student_follow_up_page.dart';
 import 'class_placement_page.dart';
 
-import '../services/auth_service.dart';
-
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  String? _role;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRole();
-  }
-
-  Future<void> _loadRole() async {
-    try {
-      final role = await AuthService.getCurrentUserRole();
-
-      if (mounted) {
-        setState(() {
-          _role = role;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _role = null;
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  bool get isAdmin => _role == 'admin';
-  bool get isTeacher => _role == 'teacher';
-
-  @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF2FBFA),
+      backgroundColor: const Color(0xFFF2FBFA), 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          isAdmin ? "Admin Dashboard ⚙️" : "Teacher Dashboard 🌟",
-          style: const TextStyle(
+        automaticallyImplyLeading: false, 
+        title: const Text(
+          "Teacher Dashboard 🌟",
+          style: TextStyle(
             color: Color(0xFF0F9D58),
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_rounded, color: Color(0xFF0F9D58), size: 30),
+            onPressed: () {
+              // TODO: Navigate to teacher profile settings
+            },
+          ),
+          const SizedBox(width: 16),
+        ],
       ),
-
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
+              // Welcome Greeting for the Teacher
               const Text(
-                "Welcome Back 👋",
+                "Welcome Back, Educator! 👋",
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
+                  color: Colors.black87,
                 ),
               ),
+              const SizedBox(height: 8),
+              const Text(
+                "Let's orchestrate your adaptive classroom today.",
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.blueGrey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 32),
 
-              const SizedBox(height: 30),
+              // Core Features Section Title
+              const Text(
+                "Classroom Tools 🛠️",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 16),
 
-              // =========================
-              // ADMIN ONLY
-              // =========================
-              if (isAdmin) ...[
-                _buildFeatureCard(
+              // Feature 1: Assessment Link Generator (Form for students)
+              _buildFeatureCard(
+                context,
+                title: "Create Assessment Link 🔗",
+                description: "Draft questions and generate a shareable web link. Students fill it out with zero login required!",
+                iconData: Icons.assignment_rounded, 
+                color: const Color(0xFFE8F5E9), // Light green
+                accentColor: const Color(0xFF0F9D58),
+                onTap: () => Navigator.push(
                   context,
-                  title: "Class Placement 🧠",
-                  description: "Run AI-based class grouping and student assignment.",
-                  icon: Icons.auto_awesome,
-                  color: const Color(0xFFFFF3E0),
-                  accent: Colors.orange,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ClassPlacementPage(),
-                      ),
-                    );
-                  },
+                  MaterialPageRoute(builder: (context) => const AssessmentLinkPage()),
                 ),
-                const SizedBox(height: 20),
+              ),
+              const SizedBox(height: 20),
 
-                _buildFeatureCard(
+              // Feature 2: Learning Intelligence Network (Analytics)
+              _buildFeatureCard(
+                context,
+                title: "Student Intelligence 🕸️",
+                description: "Monitor incoming form responses, visualize class relationships, and catch early risk signals instantly.",
+                iconData: Icons.hub_rounded,
+                color: const Color(0xFFE3F2FD), // Light blue
+                accentColor: Colors.blue,
+                onTap: () => Navigator.push(
                   context,
-                  title: "Assessment Link 🔗",
-                  description: "Generate and manage assessment links.",
-                  icon: Icons.link,
-                  color: const Color(0xFFE8F5E9),
-                  accent: const Color(0xFF0F9D58),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AssessmentLinkPage(),
-                      ),
-                    );
-                  },
+                  MaterialPageRoute(builder: (context) => const ClassNetworkPage()),
                 ),
-                const SizedBox(height: 30),
-              ],
-
-              // =========================
-              // COMMON FEATURES
-              // =========================
-              _buildFeatureCard(
-                context,
-                title: "Class Network 🕸️",
-                description: "View student connections and learning behavior map.",
-                icon: Icons.hub,
-                color: const Color(0xFFE3F2FD),
-                accent: Colors.blue,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ClassNetworkPage(),
-                    ),
-                  );
-                },
               ),
-
               const SizedBox(height: 20),
 
+              // Feature 3: AI Re-Streaming System (Class placement logic connected to Follow-up Page)
               _buildFeatureCard(
                 context,
-                title: "Pre-Admission Test 📝",
-                description: "Student learning profile assessment system.",
-                icon: Icons.assignment,
-                color: const Color(0xFFEDE7F6),
-                accent: const Color(0xFF6A1B9A),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const PreAdmissionTestPage(),
-                    ),
-                  );
-                },
+                title: "AI Class Placement 🚀",
+                description: "Run end-of-cycle evaluations for your entire class. Get AI-driven recommendations for re-streaming.",
+                iconData: Icons.groups_rounded,
+                color: const Color(0xFFFFF3E0), // Light orange
+                accentColor: Colors.orange,
+                onTap: () => Navigator.push(
+                  context,
+                  // Here we link to the newly created StudentFollowUpPage
+                  MaterialPageRoute(builder: (context) => const StudentFollowUpPage()),
+                ),
               ),
-
               const SizedBox(height: 20),
 
+              // Feature 4: Special Request Form
               _buildFeatureCard(
                 context,
-                title: "Student Follow-up 📊",
-                description: "Track student progress and learning insights.",
-                icon: Icons.insights,
-                color: const Color(0xFFFFFDE7),
-                accent: Colors.amber,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const StudentFollowUpPage(),
-                    ),
-                  );
-                },
+                title: "Special Request 🧩",
+                description: "Submit student special needs or conditions to help create a supportive learning environment.",
+                iconData: Icons.health_and_safety_rounded,
+                color: const Color(0xFFEDE7F6), // light purple
+                accentColor: const Color(0xFF6A1B9A),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SpecialRequestLinkPage(),
+                  ),
+                ),
               ),
-
               const SizedBox(height: 20),
-
-              _buildFeatureCard(
-                context,
-                title: "Special Requests 🧩",
-                description: "Manage student needs and special conditions.",
-                icon: Icons.health_and_safety,
-                color: const Color(0xFFFCE4EC),
-                accent: Colors.pink,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SpecialRequestLinkPage(),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
         ),
@@ -216,38 +141,38 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // =========================
-  // CARD UI
-  // =========================
   Widget _buildFeatureCard(
     BuildContext context, {
     required String title,
     required String description,
-    required IconData icon,
+    required IconData iconData,
     required Color color,
-    required Color accent,
+    required Color accentColor,
     required VoidCallback onTap,
   }) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: accent.withOpacity(0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: accentColor.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
           onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24.0),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -255,7 +180,11 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(icon, color: accent, size: 28),
+                  child: Icon(
+                    iconData,
+                    size: 32,
+                    color: accentColor,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -265,27 +194,67 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: accent,
+                          color: accentColor, 
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Text(
                         description,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Colors.black54,
+                          color: Colors.grey.shade700,
+                          height: 1.4,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios,
-                    size: 14, color: accent.withOpacity(0.6)),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: accentColor.withOpacity(0.5),
+                ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Placeholder for other features (Keep this in case you need it for future modules)
+class FeaturePage extends StatelessWidget {
+  final String title;
+  const FeaturePage({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2FBFA),
+      appBar: AppBar(
+        title: Text(title),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.construction_rounded, size: 80, color: Color(0xFF0F9D58)),
+            const SizedBox(height: 16),
+            Text(
+              "$title\nWorkspace coming soon! ✨",
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 20, 
+                fontWeight: FontWeight.bold, 
+                color: Colors.blueGrey,
+              ),
+            ),
+          ],
         ),
       ),
     );

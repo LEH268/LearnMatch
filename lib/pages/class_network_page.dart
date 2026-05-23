@@ -442,14 +442,9 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
               name: d['name'] ?? 'Unknown',
               emergencyContact: d['emergencyContact'] ?? '',
               className: d['className'] ?? 'Unassigned',
-              grades: d['grades'] ?? '',
-              basicInfo: d['basicInfo'] ?? '',
-              specialConditions: d['specialConditions'] ?? '',
-              aiCognitiveAnalysis: d['aiCognitiveAnalysis'] ?? '',
-              aiAdaptivePath: d['aiAdaptivePath'] ?? '',
-                varkScores: Map<String, int>.from(d['varkScores'] ?? {}),
-                personalityScores:
-                  Map<String, int>.from(d['personalityScores'] ?? {}),
+              varkScores: Map<String, int>.from(d['varkScores'] ?? {}),
+              personalityScores:
+                  Map<String, int>.from(d['personalityScores'] ?? {}), grades: '', basicInfo: '', specialConditions: '', aiCognitiveAnalysis: '', aiAdaptivePath: '',
             );
           }).toList();
 
@@ -538,7 +533,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                 ),
     );
   }
-//hi
+
   Widget _buildCanvas() {
     return InteractiveViewer(
       constrained: false,

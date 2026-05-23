@@ -1,10 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:learn_match/models/student_record.dart';
-import 'package:learn_match/ai/fake_database.dart';
-
-class FakeDatabase {
-  static List<StudentRecord> students = [];
-}
 
 class StudentEvaluationForm extends StatefulWidget {
   const StudentEvaluationForm({super.key});
@@ -59,43 +53,59 @@ List<String> _answers = [];
     });
   }
 
+  // 模拟自动保存到云端数据库 (Firebase) 的过程
   Future<void> _submitFormToDatabase() async {
     setState(() {
       _isSavingToDatabase = true;
     });
 
-    await Future.delayed(const Duration(seconds: 1));
-
-    // 🔥 STEP 5 KEY: push into fake database
-    FakeDatabase.students.add(
-      StudentRecord(
-        id: "S${FakeDatabase.students.length + 1}",
-        name: "Student ${FakeDatabase.students.length + 1}",
-        hasSubmittedForm: true,
-        evaluationScore: _calculateScoreFromAnswers(),
-        detailedAnswers: _answers.map((e) => _convertAnswerToScore(e)).toList(),
-      ),
-    );
+    // TODO: In a real app, this is where you write to Firebase:
+    // await FirebaseFirestore.instance.collection('evaluations').add({
+    //   'studentId': currentUser.id,
+    //   'score': _totalScore,
+    //   'timestamp': FieldValue.serverTimestamp(),
+    // });
+    
+    // Simulate network delay for saving
+    await Future.delayed(const Duration(seconds: 2));
 
     setState(() {
       _isSavingToDatabase = false;
     });
 
+    // Show success dialog
     if (mounted) {
-      Navigator.pop(context);
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Column(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 50),
+              SizedBox(height: 10),
+              Text('Auto-Saved! 🎉', textAlign: TextAlign.center),
+            ],
+          ),
+          content: const Text(
+            'Your evaluation has been successfully uploaded to the school database. Your teacher can now sync it.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Go back to previous screen
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
+                child: const Text('Back to Home'),
+              ),
+            ),
+          ],
+        ),
+      );
     }
-  }
-
-  int _calculateScoreFromAnswers() {
-    return _answers.length * 5;
-  }
-
-  int _convertAnswerToScore(String answer) {
-    if (answer.length > 200) return 5;
-    if (answer.length > 100) return 4;
-    if (answer.length > 50) return 3;
-    if (answer.length > 20) return 2;
-    return 1;
   }
 
   @override
