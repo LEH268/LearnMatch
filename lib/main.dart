@@ -3,15 +3,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
 
-import 'login_page.dart';
-import 'signup_page.dart';
-import 'home_page.dart';
+import 'pages/login_page.dart';
+import 'pages/signup_page.dart';
+import 'pages/home_page.dart';
 import 'pages/class_network_page.dart';
-
 import 'pages/pre_admission_test.dart';
-import 'pages/class_network_page.dart';
 import 'pages/student_evaluation_form.dart';
 import 'pages/special_request_form_page.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
