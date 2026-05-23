@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // IMPORT: Firestore database
 import 'pre_admission_report.dart';
-import '../services/firestore_service.dart';
 
-// ==========================================
-// TEST PAGE
-// ==========================================
 class PreAdmissionTestPage extends StatefulWidget {
   const PreAdmissionTestPage({super.key});
 
@@ -13,8 +10,6 @@ class PreAdmissionTestPage extends StatefulWidget {
 }
 
 class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
-  final FirestoreService _firestore = FirestoreService();
-
   int _currentIndex = 0;
 
   final Map<String, int> _varkScores = {'V': 0, 'A': 0, 'R': 0, 'K': 0};
@@ -26,6 +21,7 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
   int _impulsivityScore = 0;
   int _reflectivityScore = 0;
 
+  // Student Info Variables
   String _studentName = "";
   String _emergencyContact = "";
   bool _started = false;
@@ -239,7 +235,6 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
         if (_varkScores.containsKey(tag)) {
           _varkScores[tag] = _varkScores[tag]! + 1;
         }
-
         if (tag == 'Structured') _structuredScore++;
         if (tag == 'Exploratory') _exploratoryScore++;
         if (tag == 'Introvert') _introvertScore++;
@@ -256,97 +251,188 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
     });
   }
 
-  Future<void> _submitTest() async {
-    Map<String, int> cognitive = {
-      'S': _structuredScore,
-      'E': _exploratoryScore,
-      'I': _introvertScore,
-      'X': _extrovertScore,
-      'P': _impulsivityScore,
-      'R': _reflectivityScore,
-    };
+  // ASYNC FUNCTION: Save data to Firebase when the test is completed
+  void _submitTest() async {
+    try {
+      // 1. Create a 'students' collection in Firestore and add this user's data
+      await FirebaseFirestore.instance.collection('students').add({
+        'name': _studentName,
+        'emergencyContact': _emergencyContact,
+        'varkScores': _varkScores,
+        'personalityScores': {
+          'Structured': _structuredScore,
+          'Exploratory': _exploratoryScore,
+          'Introvert': _introvertScore,
+          'Extrovert': _extrovertScore,
+          'Impulsivity': _impulsivityScore,
+          'Reflectivity': _reflectivityScore,
+        },
+        'testCompletedAt': FieldValue.serverTimestamp(), // Automatically record submission time
+      });
 
-    // ✅ SAVE TO FIREBASE
-    await _firestore.saveStudentTestResult(
-      name: _studentName,
-      emergencyContact: _emergencyContact,
-      varkScores: _varkScores,
-      cognitiveScores: cognitive,
-    );
-
-    // go report page
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ReportPage(
-          varkScores: _varkScores,
-          pScores: cognitive,
-        ),
-      ),
-    );
+      // 2. Navigate to the report page ONLY after successful save
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReportPage(
+              varkScores: _varkScores,
+              pScores: {
+                'S': _structuredScore,
+                'E': _exploratoryScore,
+                'I': _introvertScore,
+                'X': _extrovertScore,
+                'P': _impulsivityScore,
+                'R': _reflectivityScore,
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show an error popup if saving to Firebase fails
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to save results: $e")),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     double progress =
-        (_questions.isEmpty) ? 0 : (_currentIndex + 1) / _questions.length;
+        _questions.isEmpty ? 0 : (_currentIndex + 1) / _questions.length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Pre Admission Test")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: _started ? _buildQuestionUI(progress) : _buildStartUI(),
+      backgroundColor: const Color(0xFFF2FBFA),
+      appBar: AppBar(
+        title: const Text(
+          "Pre-Admission Test",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: const Color(0xFF0F9D58),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: _started ? _buildQuestionUI(progress) : _buildStartUI(),
+        ),
       ),
     );
   }
 
+  // START SCREEN UI
   Widget _buildStartUI() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const Text(
+          "Before you start",
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+
         TextField(
           decoration: const InputDecoration(labelText: "Student Name"),
           onChanged: (v) => _studentName = v,
         ),
+
+        const SizedBox(height: 20),
+
         TextField(
           decoration: const InputDecoration(labelText: "Emergency Contact"),
           onChanged: (v) => _emergencyContact = v,
         ),
-        const SizedBox(height: 20),
+
+        const SizedBox(height: 30),
+
         ElevatedButton(
           onPressed: () {
             if (_studentName.isEmpty || _emergencyContact.isEmpty) return;
-            setState(() => _started = true);
+
+            setState(() {
+              _started = true;
+            });
           },
-          child: const Text("Start"),
-        )
+          style: ElevatedButton.styleFrom(
+             backgroundColor: const Color(0xFF0F9D58),
+             foregroundColor: Colors.white,
+          ),
+          child: const Text("Start Test"),
+        ),
       ],
     );
   }
 
+  // QUESTION SCREEN UI
   Widget _buildQuestionUI(double progress) {
-    final q = _questions[_currentIndex];
+    final currentQ = _questions[_currentIndex];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LinearProgressIndicator(value: progress),
-        const SizedBox(height: 20),
-
-        Text(q['theme']),
-        const SizedBox(height: 10),
-        Text(
-          q['question'],
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.grey.shade300,
+            color: const Color(0xFF0F9D58),
+            minHeight: 12,
+          ),
         ),
+        const SizedBox(height: 24),
 
-        const SizedBox(height: 20),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                currentQ['theme'],
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.blueGrey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
 
-        ...(q['options'] as List).map((opt) {
-          return ElevatedButton(
-            onPressed: () => _answerQuestion(opt['tags']),
-            child: Text(opt['text']),
-          );
-        }),
+              Text(
+                currentQ['question'],
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              ...((currentQ['options'] as List).map((opt) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ElevatedButton(
+                    onPressed: () => _answerQuestion(opt['tags']),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black87,
+                      elevation: 2,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 20, horizontal: 20),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(opt['text'],
+                        style: const TextStyle(fontSize: 16)),
+                  ),
+                );
+              })),
+            ],
+          ),
+        ),
       ],
     );
   }
