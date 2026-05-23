@@ -8,28 +8,40 @@ class StudentEvaluationForm extends StatefulWidget {
 }
 
 class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
+  bool _isPersonalInfoDone = false;
+
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emergencyContactController = TextEditingController();
+
   int _currentIndex = 0;
   bool _isSavingToDatabase = false; // State to show saving process
 
-  final TextEditingController _answerController =
-    TextEditingController();
-
-List<String> _answers = [];
+  final TextEditingController _answerController = TextEditingController();
+  List<String> _answers = [];
 
   final List<String> _questions = [
     "1. How was your experience in this class with your classmates for the past year?",
-
     "2. How was your experience in this class with your teachers for the past year?",
-
     "3. What has been the highlight throughout the year?",
-
     "4. Would you like to stay in this class? Why or why not?",
-
     "5. What do you wish the class could do differently?",
   ];
 
-  void _submitAnswer() {
+  void _startEvaluation() {
+    if (_nameController.text.trim().isEmpty || _emergencyContactController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please fill in your Name and Emergency Contact."),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _isPersonalInfoDone = true;
+    });
+  }
 
+  void _submitAnswer() {
     if (_answerController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -40,11 +52,9 @@ List<String> _answers = [];
     }
 
     _answers.add(_answerController.text);
-
     _answerController.clear();
 
     setState(() {
-
       if (_currentIndex < _questions.length - 1) {
         _currentIndex++;
       } else {
@@ -53,18 +63,10 @@ List<String> _answers = [];
     });
   }
 
-  // 模拟自动保存到云端数据库 (Firebase) 的过程
   Future<void> _submitFormToDatabase() async {
     setState(() {
       _isSavingToDatabase = true;
     });
-
-    // TODO: In a real app, this is where you write to Firebase:
-    // await FirebaseFirestore.instance.collection('evaluations').add({
-    //   'studentId': currentUser.id,
-    //   'score': _totalScore,
-    //   'timestamp': FieldValue.serverTimestamp(),
-    // });
     
     // Simulate network delay for saving
     await Future.delayed(const Duration(seconds: 2));
@@ -125,30 +127,108 @@ List<String> _answers = [];
           padding: const EdgeInsets.all(24.0),
           child: _isSavingToDatabase 
             ? _buildSavingScreen() 
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.grey.shade300,
-                      color: Colors.deepPurpleAccent,
-                      minHeight: 12,
-                    ),
+
+            : !_isPersonalInfoDone 
+                ? _buildPersonalInfoPage()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: Colors.grey.shade300,
+                          color: Colors.deepPurpleAccent,
+                          minHeight: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: _buildQuestionPage(),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: _buildQuestionPage(),
-                  ),
-                ],
-              ),
         ),
       ),
     );
   }
 
-  // A custom saving screen shown when student completes the form
+  Widget _buildPersonalInfoPage() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          "Student Information",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Please provide your details before starting the evaluation.",
+          style: TextStyle(
+            fontSize: 15,
+            color: Colors.blueGrey,
+          ),
+        ),
+        const SizedBox(height: 32),
+    
+        TextField(
+          controller: _nameController,
+          decoration: InputDecoration(
+            labelText: "Full Name",
+            hintText: "e.g. John Doe",
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+ 
+        TextField(
+          controller: _emergencyContactController,
+          keyboardType: TextInputType.phone, 
+          decoration: InputDecoration(
+            labelText: "Emergency Contact",
+            hintText: "e.g. 012-3456789",
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 40),
+        
+        ElevatedButton(
+          onPressed: _startEvaluation,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: const Text(
+            "Start Evaluation",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSavingScreen() {
     return const Center(
       child: Column(
@@ -166,13 +246,11 @@ List<String> _answers = [];
   }
 
   Widget _buildQuestionPage() {
-
     String currentQuestion = _questions[_currentIndex];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-
         Text(
           "Question ${_currentIndex + 1}",
           style: const TextStyle(
@@ -181,9 +259,7 @@ List<String> _answers = [];
             fontWeight: FontWeight.bold,
           ),
         ),
-
         const SizedBox(height: 12),
-
         Text(
           currentQuestion,
           style: const TextStyle(
@@ -192,40 +268,31 @@ List<String> _answers = [];
             color: Colors.black87,
           ),
         ),
-
         const SizedBox(height: 30),
-
         TextField(
           controller: _answerController,
           maxLines: 6,
-
           decoration: InputDecoration(
             hintText: "Write your response here...",
             filled: true,
             fillColor: Colors.white,
-
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
           ),
         ),
-
         const SizedBox(height: 30),
-
         ElevatedButton(
           onPressed: _submitAnswer,
-
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.deepPurple,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 18),
-
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-
           child: Text(
             _currentIndex == _questions.length - 1
                 ? "Submit Evaluation"
