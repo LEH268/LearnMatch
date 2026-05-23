@@ -11,8 +11,6 @@ class PreAdmissionTestPage extends StatefulWidget {
 class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
   int _currentIndex = 0;
 
-  // 核心计分池 (隐藏在后台)
-  // VARK: Visual, Auditory, Read/Write, Kinesthetic
   final Map<String, int> _varkScores = {'V': 0, 'A': 0, 'R': 0, 'K': 0};
   
   // Personality Traits

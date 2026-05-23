@@ -7,10 +7,8 @@ class AssessmentLinkPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
-    // 暂时先用 localhost
-    // 以后 deploy 后换成真实网址
     const String assessmentLink =
-        "http://localhost:55978/#/pre-admission-test";
+        "https://learnmatch-2b5c4.web.app/#/pre-admission-test";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2FBFA),
