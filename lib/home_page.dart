@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'pre_admission_test.dart';
-import 'class_network_page.dart'; // Added the import for the new Class Network Page
+import 'class_network_page.dart'; 
 import 'assessment_link_page.dart';
+import 'student_follow_up_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -85,7 +86,6 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 20),
 
               // Feature 2: Learning Intelligence Network (Analytics)
-              // This now navigates to the new ClassNetworkPage!
               _buildFeatureCard(
                 context,
                 title: "Student Intelligence 🕸️",
@@ -100,7 +100,7 @@ class HomePage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Feature 3: AI Re-Streaming System (Class placement logic)
+              // Feature 3: AI Re-Streaming System (Class placement logic connected to Follow-up Page)
               _buildFeatureCard(
                 context,
                 title: "AI Class Placement 🚀",
@@ -110,7 +110,8 @@ class HomePage extends StatelessWidget {
                 accentColor: Colors.orange,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const FeaturePage(title: "AI Re-Streaming System")),
+                  // Here we link to the newly created StudentFollowUpPage
+                  MaterialPageRoute(builder: (context) => const StudentFollowUpPage()),
                 ),
               ),
             ],
@@ -204,7 +205,7 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// Placeholder for other features
+// Placeholder for other features (Keep this in case you need it for future modules)
 class FeaturePage extends StatelessWidget {
   final String title;
   const FeaturePage({super.key, required this.title});
