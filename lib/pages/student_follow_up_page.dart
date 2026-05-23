@@ -23,7 +23,7 @@ class StudentRecord {
     required this.hasSubmittedForm,
     this.evaluationScore,
     this.detailedAnswers,
-    this.className = '',
+    this.className = 'No Class', // 默认给一个 'No Class' 防止空值错误
   });
 }
 
@@ -80,10 +80,15 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
         final data = doc.data() as Map<String, dynamic>? ?? {};
 
         // 2. 极度安全的类型解析
+        String parsedClassName = data['className']?.toString().trim() ?? '';
+        if (parsedClassName.isEmpty) {
+          parsedClassName = 'No Class'; // 解决学生 form 没有 classname 的问题
+        }
+
         return StudentRecord(
           id: doc.id,
           name: data['name']?.toString() ?? 'Unknown Student',
-          className: data['className']?.toString() ?? '',
+          className: parsedClassName,
           hasSubmittedForm: data['hasSubmittedForm'] == true || data['hasSubmittedForm'] == 'true',
           evaluationScore: int.tryParse(data['evaluationScore']?.toString() ?? ''),
           detailedAnswers: (data['detailedAnswers'] as List<dynamic>?)
@@ -448,8 +453,15 @@ class StudentDetailPage extends StatefulWidget {
 }
 
 class _StudentDetailPageState extends State<StudentDetailPage> {
-  List<double> _termGrades = [];
-  final TextEditingController _gradeController = TextEditingController();
+  // === 新的 Academic Year 和 Half-Year Grades 控制 ===
+  String _selectedYear = 'Year 1';
+  final List<String> _yearOptions = [
+    'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6',
+    'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5'
+  ];
+  final TextEditingController _firstHalfController = TextEditingController();
+  final TextEditingController _secondHalfController = TextEditingController();
+
   final TextEditingController _teacherCommentController = TextEditingController();
 
   bool _isSyncing = false;
@@ -465,29 +477,23 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
     'Part 5: Overall Growth'
   ];
 
-  void _addGrade() {
-    if (_gradeController.text.isNotEmpty) {
-      double? grade = double.tryParse(_gradeController.text);
-      if (grade != null && grade >= 0 && grade <= 100) {
-        setState(() {
-          _termGrades.add(grade);
-          _gradeController.clear();
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter a valid grade between 0 and 100')),
-        );
-      }
-    }
-  }
-
+  // 计算整年平均分逻辑
   double _calculateAverageGrade() {
-    if (_termGrades.isEmpty) return 0.0;
-    return _termGrades.fold(0.0, (p, c) => p + c) / _termGrades.length;
+    double firstHalf = double.tryParse(_firstHalfController.text) ?? -1.0;
+    double secondHalf = double.tryParse(_secondHalfController.text) ?? -1.0;
+
+    if (firstHalf >= 0 && secondHalf >= 0) {
+      return (firstHalf + secondHalf) / 2; // 上半年和下半年都有
+    } else if (firstHalf >= 0) {
+      return firstHalf; // 只有上半年
+    } else if (secondHalf >= 0) {
+      return secondHalf; // 只有下半年
+    }
+    return 0.0;
   }
 
   String _getGradeLetter(double average) {
-    if (average == 0.0 && _termGrades.isEmpty) return 'N/A';
+    if (_firstHalfController.text.isEmpty && _secondHalfController.text.isEmpty) return 'N/A';
     if (average >= 90) return 'A+';
     if (average >= 80) return 'A';
     if (average >= 75) return 'A-';
@@ -503,6 +509,9 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
       _isSyncing = true;
     });
 
+    // 模拟数据拉取
+    // 💡 提示：这里在对接 Firebase 时，你应该通过 widget.student.id 去直接查询对应的 Form
+    // 因为即使学生没有 ClassName，ID 或者名字也是可以对应上的。
     await Future.delayed(const Duration(seconds: 1));
 
     setState(() {
@@ -614,9 +623,9 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   }
 
   void _generateReport() {
-    if (_termGrades.isEmpty) {
+    if (_firstHalfController.text.isEmpty && _secondHalfController.text.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please add at least one term grade.')));
+          .showSnackBar(const SnackBar(content: Text('Please enter at least First Half or Second Half grade.')));
       return;
     }
     if (!_isDataFetched && widget.student.hasSubmittedForm) {
@@ -643,6 +652,9 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
       MaterialPageRoute(
         builder: (context) => YearlyReportPage(
           studentName: widget.student.name,
+          academicYear: _selectedYear,
+          firstHalfGrade: double.tryParse(_firstHalfController.text),
+          secondHalfGrade: double.tryParse(_secondHalfController.text),
           averageGrade: avgGrade,
           gradeLetter: gradeLetter,
           evaluationScore: _fetchedStudentEvalScore,
@@ -666,37 +678,46 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Term Grades Input
-            const Text('1. Term Grades Input', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            // 1. 学年和半年成绩输入 (Academic Performance Input)
+            const Text('1. Academic Performance Input', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
+            
+            // Year Dropdown
+            DropdownButtonFormField<String>(
+              value: _selectedYear,
+              items: _yearOptions.map((year) => DropdownMenuItem(value: year, child: Text(year))).toList(),
+              onChanged: (val) => setState(() => _selectedYear = val!),
+              decoration: const InputDecoration(labelText: 'Academic Year', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+
+            // First Half and Second Half Grades
             Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _gradeController,
+                    controller: _firstHalfController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Enter Grade (0-100)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'First Half Year (0-100)', border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 10),
-                ElevatedButton(onPressed: _addGrade, child: const Text('Add')),
+                Expanded(
+                  child: TextField(
+                    controller: _secondHalfController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Second Half Year (0-100)', border: OutlineInputBorder()),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8.0,
-              children: _termGrades.asMap().entries.map((entry) {
-                return Chip(
-                  label: Text('T${entry.key + 1}: ${entry.value}'),
-                  onDeleted: () => setState(() => _termGrades.removeAt(entry.key)),
-                );
-              }).toList(),
-            ),
+            const SizedBox(height: 8),
+            const Text('* Leave blank if the half-year grade is not available yet.', style: TextStyle(color: Colors.grey, fontSize: 12)),
             const Divider(height: 40, thickness: 1),
 
             // 2. Student Database Sync
             const Text('2. Sync Student Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Text('Pull data from the evaluation link submitted by the student.',
+            const Text('Pull data from the evaluation link submitted by the student. (Matches by ID/Name)',
                 style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 10),
             Container(
@@ -788,6 +809,9 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
 // ==========================================
 class YearlyReportPage extends StatelessWidget {
   final String studentName;
+  final String academicYear;
+  final double? firstHalfGrade;
+  final double? secondHalfGrade;
   final double averageGrade;
   final String gradeLetter;
   final int evaluationScore;
@@ -798,6 +822,9 @@ class YearlyReportPage extends StatelessWidget {
   const YearlyReportPage({
     Key? key,
     required this.studentName,
+    required this.academicYear,
+    this.firstHalfGrade,
+    this.secondHalfGrade,
     required this.averageGrade,
     required this.gradeLetter,
     required this.evaluationScore,
@@ -825,7 +852,14 @@ class YearlyReportPage extends StatelessWidget {
               child: ListTile(
                 title: const Text('Academic Performance',
                     style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-                subtitle: Text('Average Score: ${averageGrade.toStringAsFixed(1)}/100\nFinal Grade: $gradeLetter'),
+                subtitle: Text(
+                  'Academic Year: $academicYear\n'
+                  'First Half Year: ${firstHalfGrade != null ? firstHalfGrade!.toStringAsFixed(1) : 'N/A'}\n'
+                  'Second Half Year: ${secondHalfGrade != null ? secondHalfGrade!.toStringAsFixed(1) : 'N/A'}\n'
+                  '-------------------------\n'
+                  'Yearly Average: ${averageGrade.toStringAsFixed(1)}/100\n'
+                  'Final Grade: $gradeLetter'
+                ),
               ),
             ),
             const SizedBox(height: 10),
