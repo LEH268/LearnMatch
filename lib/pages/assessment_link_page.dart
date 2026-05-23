@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'pre_admission_report.dart';
-import 'class_placement_page.dart'; // 引入班级配置页面
+import 'class_placement_page.dart';
 
 class AssessmentLinkPage extends StatefulWidget {
   const AssessmentLinkPage({super.key});
@@ -16,7 +16,6 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
   static const String _assessmentLink =
       "https://learnmatch-2b5c4.web.app/#/pre-admission-test";
 
-  // 搜索与筛选状态
   String _searchQuery = '';
   String _selectedFilter = 'All';
 
@@ -138,12 +137,10 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
 
                   const SizedBox(height: 12),
 
-                  // ── 去分班设置页面的按钮 ──
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // 跳转到配置和分班页面
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -181,7 +178,7 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
             ),
             const SizedBox(height: 16),
 
-            // 搜索框
+            // search bar
             TextField(
               decoration: InputDecoration(
                 hintText: 'Search by student name...',
@@ -219,7 +216,6 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
 
                 final docs = snapshot.data!.docs;
 
-                // 提取所有可用的班级用于生成 Filter 标签
                 final classSet = <String>{};
                 for (var doc in docs) {
                   final data = doc.data() as Map<String, dynamic>;
@@ -229,7 +225,7 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
                 final classList = classSet.toList()..sort();
                 final filterOptions = ['All', 'Unassigned', ...classList];
 
-                // 过滤和搜索逻辑
+                // filter and search logic
                 final filteredDocs = docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final name = (data['name'] ?? '').toString().toLowerCase();
@@ -253,7 +249,6 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 横向滚动的 Filter 标签
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(

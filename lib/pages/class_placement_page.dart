@@ -25,7 +25,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
   bool _loadingClasses = true;
 
   final TextEditingController _classNameController = TextEditingController();
-  String _selectedTargetVark = 'V'; // 默认目标群体是 V
+  String _selectedTargetVark = 'V';
 
   @override
   void initState() {
@@ -50,7 +50,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
             'id': d.id,
             'className': data['className'] ?? d.id,
             'studentCount': data['studentCount'] ?? 0,
-            'targetVARK': data['targetVARK'] ?? 'V', // 获取偏好
+            'targetVARK': data['targetVARK'] ?? 'V',
           };
         }).toList();
         _loadingClasses = false;
@@ -66,7 +66,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
     try {
       await _db.collection('classes').doc(className.trim()).set({
         'className': className.trim(),
-        'targetVARK': _selectedTargetVark, // 存储目标VARK群体
+        'targetVARK': _selectedTargetVark, 
         'studentCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -215,7 +215,6 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
         _buildSectionHeader('Step 1: Setup Classes', Icons.add_circle_outline_rounded, const Color(0xFF0F9D58)),
         const SizedBox(height: 12),
 
-        // 班级创建输入框和类型下拉
         Row(
           children: [
             Expanded(

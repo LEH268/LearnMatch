@@ -351,7 +351,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
     );
   }
 
-// =====================================================
+  // =====================================================
   // DELETE TEACHER DIALOG
   // =====================================================
   void _confirmDeleteTeacher(Teacher teacher) {
@@ -363,7 +363,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red.shade400),
             const SizedBox(width: 8),
-            const Text('删除老师 (Delete Teacher)'),
+            const Text('Delete Teacher'),
           ],
         ),
         content: Text('Are you sure you want to remove ${teacher.name}? This action cannot be undone.'),
@@ -374,7 +374,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
           ),
           ElevatedButton(
             onPressed: () async {
-              // 从 Firestore 删除老师数据
+              // delete teacher data from Firestore
               await FirebaseFirestore.instance
                   .collection('teachers')
                   .doc(teacher.id)
@@ -382,7 +382,6 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
               
               if (ctx.mounted) Navigator.pop(ctx);
 
-              // 如果删除的老师刚好是当前 Focus 的老师，则重置视图
               if (_focusedTeacherId == teacher.id) {
                 setState(() {
                   _focusedTeacherId = null;
@@ -1036,10 +1035,10 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
                     child: GestureDetector(
-                      // 短按功能：打开、聚焦或展开
+                      
                       onTap: () => _handleNodeTap(node),
                       
-                      // 新增长按功能：长按老师节点触发删除
+                      // long press to delete teacher (only for teacher nodes)
                       onLongPress: () {
                         if (node.type == NodeType.teacherNode) {
                           _confirmDeleteTeacher(node.data as Teacher);

@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-// 请确保这里的路径正确指向你的 firestore_service.dart
+import 'package:google_generative_ai/google_generative_ai.dart';
 import '../services/firestore_service.dart';
 
 // ==========================================
@@ -23,7 +22,7 @@ class StudentRecord {
     required this.hasSubmittedForm,
     this.evaluationScore,
     this.detailedAnswers,
-    this.className = 'No Class', // 默认给一个 'No Class' 防止空值错误
+    this.className = 'No Class',
   });
 }
 
@@ -41,7 +40,6 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
   final String evaluationLink =
       "https://learnmatch-2b5c4.web.app/#/student-evaluation";
 
-  // === Firebase 服务和数据流 ===
   final FirestoreService _firestoreService = FirestoreService();
   StreamSubscription<QuerySnapshot>? _studentsSubscription;
 
@@ -72,17 +70,15 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
     _fetchStudentsFromFirebase();
   }
 
-  // === 核心逻辑：从 Firebase 实时拉取所有数据（加入安全解析） ===
   void _fetchStudentsFromFirebase() {
     _studentsSubscription = _firestoreService.getStudentsStream().listen((snapshot) {
       final students = snapshot.docs.map((doc) {
-        // 1. 获取数据，防 null 处理
+        
         final data = doc.data() as Map<String, dynamic>? ?? {};
 
-        // 2. 极度安全的类型解析
         String parsedClassName = data['className']?.toString().trim() ?? '';
         if (parsedClassName.isEmpty) {
-          parsedClassName = 'No Class'; // 解决学生 form 没有 classname 的问题
+          parsedClassName = 'No Class'; 
         }
 
         return StudentRecord(
@@ -453,7 +449,6 @@ class StudentDetailPage extends StatefulWidget {
 }
 
 class _StudentDetailPageState extends State<StudentDetailPage> {
-  // === 新的 Academic Year 和 Half-Year Grades 控制 ===
   String _selectedYear = 'Year 1';
   final List<String> _yearOptions = [
     'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6',
@@ -468,6 +463,12 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   bool _isDataFetched = false;
   int _fetchedStudentEvalScore = 0;
   List<int> _fetchedDetailedAnswers = [];
+  bool _isGeneratingAI = false;
+  
+  final aiModel = GenerativeModel(
+    model: 'gemini-2.5-flash',
+    apiKey: '', 
+  );
 
   final List<String> _formQuestions = [
     'Part 1: Class Comfort & Environment',
@@ -477,17 +478,16 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
     'Part 5: Overall Growth'
   ];
 
-  // 计算整年平均分逻辑
   double _calculateAverageGrade() {
     double firstHalf = double.tryParse(_firstHalfController.text) ?? -1.0;
     double secondHalf = double.tryParse(_secondHalfController.text) ?? -1.0;
 
     if (firstHalf >= 0 && secondHalf >= 0) {
-      return (firstHalf + secondHalf) / 2; // 上半年和下半年都有
+      return (firstHalf + secondHalf) / 2;
     } else if (firstHalf >= 0) {
-      return firstHalf; // 只有上半年
+      return firstHalf; 
     } else if (secondHalf >= 0) {
-      return secondHalf; // 只有下半年
+      return secondHalf; 
     }
     return 0.0;
   }
@@ -509,9 +509,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
       _isSyncing = true;
     });
 
-    // 模拟数据拉取
-    // 💡 提示：这里在对接 Firebase 时，你应该通过 widget.student.id 去直接查询对应的 Form
-    // 因为即使学生没有 ClassName，ID 或者名字也是可以对应上的。
     await Future.delayed(const Duration(seconds: 1));
 
     setState(() {
@@ -603,67 +600,93 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
     );
   }
 
-  String _simulateAIAnalysis(String comment) {
-    if (comment.isEmpty) return "No teacher comment provided for AI analysis.";
-    String lowerComment = comment.toLowerCase();
-
-    if ((lowerComment.contains('excellent') ||
-            lowerComment.contains('good') ||
-            lowerComment.contains('great')) &&
-        !(lowerComment.contains('struggle') || lowerComment.contains('poor'))) {
-      return "AI Conclusion: Positive learning attitude. Grasps concepts easily.";
-    } else if (lowerComment.contains('struggle') ||
-        lowerComment.contains('hard') ||
-        lowerComment.contains('poor')) {
-      return "AI Conclusion: Facing academic challenges. Requires pacing adjustments.";
-    } else if (lowerComment.contains('improve') || lowerComment.contains('better')) {
-      return "AI Conclusion: Showing gradual progress and positive development.";
-    }
-    return "AI Conclusion: Maintains a standard and steady performance.";
-  }
-
-  void _generateReport() {
+  // AI analysis and recommendation generation
+  Future<void> _generateReport() async {
+    
     if (_firstHalfController.text.isEmpty && _secondHalfController.text.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please enter at least First Half or Second Half grade.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter at least First Half or Second Half grade.')));
       return;
     }
     if (!_isDataFetched && widget.student.hasSubmittedForm) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please sync the student\'s data first.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sync the student\'s data first.')));
       return;
     }
 
     double avgGrade = _calculateAverageGrade();
     String gradeLetter = _getGradeLetter(avgGrade);
-    String aiAnalysis = _simulateAIAnalysis(_teacherCommentController.text);
-
-    String finalRecommendation = "";
-    if (avgGrade >= 75 && _fetchedStudentEvalScore >= 20) {
-      finalRecommendation = "${widget.student.name} is excelling and comfortable. No class change needed.";
-    } else if (avgGrade < 60 || _fetchedStudentEvalScore < 12) {
-      finalRecommendation = "${widget.student.name} is struggling. Consider re-streaming or dedicated tutoring.";
-    } else {
-      finalRecommendation = "${widget.student.name} fits reasonably well. Standard monitoring advised.";
+    String teacherComment = _teacherCommentController.text;
+    
+    if (teacherComment.isEmpty) {
+      teacherComment = "No specific observation provided by the teacher.";
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => YearlyReportPage(
-          studentName: widget.student.name,
-          academicYear: _selectedYear,
-          firstHalfGrade: double.tryParse(_firstHalfController.text),
-          secondHalfGrade: double.tryParse(_secondHalfController.text),
-          averageGrade: avgGrade,
-          gradeLetter: gradeLetter,
-          evaluationScore: _fetchedStudentEvalScore,
-          hasEvalData: _isDataFetched,
-          aiAnalysis: aiAnalysis,
-          recommendation: finalRecommendation,
-        ),
-      ),
-    );
+    setState(() {
+      _isGeneratingAI = true;
+    });
+
+    try {
+      final prompt = """
+You are an expert Educational AI Assistant helping a teacher evaluate a student for next year's class placement (Re-streaming).
+
+Student Name: ${widget.student.name}
+Yearly Average Grade: $avgGrade / 100 ($gradeLetter)
+Student Self-Evaluation Score: $_fetchedStudentEvalScore / 25 (Higher score means they are happier and more engaged)
+Teacher's Observation: "$teacherComment"
+
+Based on this data, provide:
+1. Analysis: A 2-sentence psychological and academic analysis of the student's current state.
+2. Recommendation: A 1-sentence clear recommendation on whether they should stay in the current class pace, move to a different level, or need special tutoring.
+
+Format your response EXACTLY like this:
+Analysis: [Your analysis]
+Recommendation: [Your recommendation]
+""";
+
+      final response = await aiModel.generateContent([Content.text(prompt)]);
+      final rawText = response.text ?? "";
+
+      String finalAnalysis = "Analysis failed to generate properly.";
+      String finalRecommendation = "Recommendation failed to generate properly.";
+
+      if (rawText.contains("Analysis:") && rawText.contains("Recommendation:")) {
+        final parts = rawText.split("Recommendation:");
+        finalAnalysis = parts[0].replaceAll("Analysis:", "").trim();
+        finalRecommendation = parts[1].trim();
+      } else {
+        finalAnalysis = rawText;
+        finalRecommendation = "Please refer to the analysis above.";
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => YearlyReportPage(
+              studentName: widget.student.name,
+              academicYear: _selectedYear,
+              firstHalfGrade: double.tryParse(_firstHalfController.text),
+              secondHalfGrade: double.tryParse(_secondHalfController.text),
+              averageGrade: avgGrade,
+              gradeLetter: gradeLetter,
+              evaluationScore: _fetchedStudentEvalScore,
+              hasEvalData: _isDataFetched,
+              aiAnalysis: finalAnalysis,            
+              recommendation: finalRecommendation,  
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('AI Generation Failed: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingAI = false;
+        });
+      }
+    }
   }
 
   @override
@@ -678,7 +701,6 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. 学年和半年成绩输入 (Academic Performance Input)
             const Text('1. Academic Performance Input', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             
@@ -787,9 +809,11 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
             // Generate Button
             Center(
               child: ElevatedButton.icon(
-                onPressed: _generateReport,
-                icon: const Icon(Icons.analytics),
-                label: const Text('Generate Final Report'),
+                onPressed: _isGeneratingAI ? null : _generateReport, // <-- 加上防御机制
+                icon: _isGeneratingAI 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                    : const Icon(Icons.analytics),
+                label: Text(_isGeneratingAI ? 'AI is thinking...' : 'Generate Final Report'),
                 style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                     backgroundColor: Colors.green,

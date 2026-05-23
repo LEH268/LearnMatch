@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// 请确保这里的路径正确指向你的 firestore_service.dart
 import '../services/firestore_service.dart'; 
 
 class SpecialRequestFormPage extends StatefulWidget {
@@ -15,7 +14,7 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
   final TextEditingController _othersController = TextEditingController();
 
   final FirestoreService _firestoreService = FirestoreService();
-  bool _isLoading = false; // 用于控制加载状态
+  bool _isLoading = false; 
 
   final Map<String, bool> _conditions = {
     "ADHD": false,
@@ -26,7 +25,6 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
   };
 
   Future<void> _submit() async {
-    // 1. 简单的输入验证
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter the student's name")),
@@ -39,7 +37,6 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
     });
 
     try {
-      // 2. 收集所有被勾选的状况
       List<String> selectedConditions = [];
       _conditions.forEach((key, isSelected) {
         if (isSelected) {
@@ -47,7 +44,7 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
         }
       });
 
-      // 3. 提交到 Firebase
+      // sent to firebase
       await _firestoreService.submitSpecialRequest(
         studentName: _nameController.text.trim(),
         emergencyContact: _contactController.text.trim(),
@@ -55,7 +52,6 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
         others: _othersController.text.trim(),
       );
 
-      // 4. 成功后弹窗提示
       if (mounted) {
         showDialog(
           context: context,
@@ -66,8 +62,8 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context); // 关闭 Dialog
-                  Navigator.pop(context); // 可选：提交成功后退回上一页
+                  Navigator.pop(context); 
+                  Navigator.pop(context); 
                 },
                 child: const Text("OK"),
               )
@@ -142,12 +138,11 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
                   setState(() {
                     _conditions[key] = val ?? false;
 
-                    // 如果勾选了 None，则取消勾选其他的
                     if (key == "None" && val == true) {
                       _conditions.updateAll((k, v) => false);
                       _conditions["None"] = true;
                     } 
-                    // 如果勾选了其他的，则取消勾选 None
+              
                     else if (key != "None" && val == true) {
                       _conditions["None"] = false;
                     }
