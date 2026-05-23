@@ -18,7 +18,7 @@ class EdgePainter extends CustomPainter {
     final random = Random(42);
 
     for (var edge in edges) {
-      final bool isTeacherEdge = edge.source.type == NodeType.teacherNode;
+      final bool isTeacherEdge = edge.source.type == NodeType.teacherNode || edge.target.type == NodeType.teacherNode;
 
       final start = edge.source.position + Offset(nodeSize / 2, 34);
       final end   = edge.target.position + Offset(nodeSize / 2, 34);

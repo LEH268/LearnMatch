@@ -9,7 +9,8 @@ class StudentRecord {
   final String name;
   final bool hasSubmittedForm;
   final int? evaluationScore;
-  final List<int>? detailedAnswers; // NEW: Added to store specific answers for the 5 questions
+  final List<int>? detailedAnswers;
+  final String className; // NEW: class the student belongs to
 
   StudentRecord({
     required this.id,
@@ -17,6 +18,7 @@ class StudentRecord {
     required this.hasSubmittedForm,
     this.evaluationScore,
     this.detailedAnswers,
+    this.className = '',
   });
 }
 
@@ -35,42 +37,68 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
   final String evaluationLink =
     "https://learnmatch-2b5c4.web.app/#/student-evaluation";
 
-  // Simulated database with detailed answers for students who submitted the form
+  // Simulated database
   final List<StudentRecord> _allStudents = [
-    StudentRecord(id: 'S01', name: 'Alice Smith', hasSubmittedForm: true, evaluationScore: 23, detailedAnswers: [5, 4, 5, 4, 5]),
-    StudentRecord(id: 'S02', name: 'Bob Johnson', hasSubmittedForm: false),
-    StudentRecord(id: 'S03', name: 'Charlie Brown', hasSubmittedForm: true, evaluationScore: 15, detailedAnswers: [3, 3, 3, 3, 3]),
-    StudentRecord(id: 'S04', name: 'Diana Prince', hasSubmittedForm: true, evaluationScore: 20, detailedAnswers: [4, 4, 5, 3, 4]),
-    StudentRecord(id: 'S05', name: 'Ethan Hunt', hasSubmittedForm: false),
+    StudentRecord(id: 'S01', name: 'Alice Smith', hasSubmittedForm: true, evaluationScore: 23, detailedAnswers: [5, 4, 5, 4, 5], className: 'Class V'),
+    StudentRecord(id: 'S02', name: 'Bob Johnson', hasSubmittedForm: false, className: 'Class A'),
+    StudentRecord(id: 'S03', name: 'Charlie Brown', hasSubmittedForm: true, evaluationScore: 15, detailedAnswers: [3, 3, 3, 3, 3], className: 'Class V'),
+    StudentRecord(id: 'S04', name: 'Diana Prince', hasSubmittedForm: true, evaluationScore: 20, detailedAnswers: [4, 4, 5, 3, 4], className: 'Class R'),
+    StudentRecord(id: 'S05', name: 'Ethan Hunt', hasSubmittedForm: false, className: 'Class K'),
+    StudentRecord(id: 'S06', name: 'Fiona Green', hasSubmittedForm: true, evaluationScore: 18, detailedAnswers: [4, 3, 4, 3, 4], className: 'Class A'),
+    StudentRecord(id: 'S07', name: 'George King', hasSubmittedForm: false, className: 'Class R'),
+    StudentRecord(id: 'S08', name: 'Hannah Lee', hasSubmittedForm: true, evaluationScore: 22, detailedAnswers: [5, 4, 4, 5, 4], className: 'Class K'),
   ];
 
   List<StudentRecord> _filteredStudents = [];
   final TextEditingController _searchController = TextEditingController();
 
+  // ── Filter state ─────────────────────────────
+  String _selectedClass = 'All Classes';
+  String _selectedStatus = 'All'; // All | Submitted | Pending
+  static const int _pageSize = 5;
+  int _currentPage = 0;
+
+  List<String> get _classOptions {
+    final classes = _allStudents.map((s) => s.className).toSet().toList()..sort();
+    return ['All Classes', ...classes];
+  }
+
   @override
   void initState() {
     super.initState();
-    _filteredStudents = _allStudents;
+    _applyFilters();
   }
 
-  void _filterStudents(String query) {
+  void _applyFilters() {
+    final query = _searchController.text.toLowerCase();
     setState(() {
-      if (query.isEmpty) {
-        _filteredStudents = _allStudents;
-      } else {
-        _filteredStudents = _allStudents
-            .where((student) => student.name.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
+      _currentPage = 0;
+      _filteredStudents = _allStudents.where((s) {
+        final matchName = query.isEmpty || s.name.toLowerCase().contains(query);
+        final matchClass = _selectedClass == 'All Classes' || s.className == _selectedClass;
+        final matchStatus = _selectedStatus == 'All' ||
+            (_selectedStatus == 'Submitted' && s.hasSubmittedForm) ||
+            (_selectedStatus == 'Pending' && !s.hasSubmittedForm);
+        return matchName && matchClass && matchStatus;
+      }).toList();
     });
   }
+
+  List<StudentRecord> get _pagedStudents {
+    final start = _currentPage * _pageSize;
+    final end = (start + _pageSize).clamp(0, _filteredStudents.length);
+    if (start >= _filteredStudents.length) return [];
+    return _filteredStudents.sublist(start, end);
+  }
+
+  int get _totalPages => (_filteredStudents.length / _pageSize).ceil();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF2FBFA),
       appBar: AppBar(
-        title: const Text('Select Student', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Student Reports', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.blueAccent,
@@ -80,10 +108,10 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Bar
+            // ── Search Bar ────────────────────────
             TextField(
               controller: _searchController,
-              onChanged: _filterStudents,
+              onChanged: (_) => _applyFilters(),
               decoration: InputDecoration(
                 hintText: 'Search by student name...',
                 prefixIcon: const Icon(Icons.search),
@@ -96,172 +124,279 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
-                        // Evaluation Form Link Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.deepPurple.withOpacity(0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.link_rounded,
-                        color: Colors.deepPurple,
-                      ),
-
-                      SizedBox(width: 8),
-
-                      Text(
-                        "Student Evaluation Form Link",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    "Send this evaluation link to students so they can complete their year-end self-evaluation form online. Responses will be synced into the teacher dashboard for AI-assisted re-streaming analysis.\n",
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: Colors.blueGrey,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-
+            // ── Filter Row ────────────────────────
+            Row(
+              children: [
+                // Class filter dropdown
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF6F2FF),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: Colors.deepPurple.shade100,
-                      ),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
                     ),
-
-                    child: SelectableText(
-                      evaluationLink,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    child: DropdownButton<String>(
+                      value: _selectedClass,
+                      isExpanded: true,
+                      underline: const SizedBox(),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.blueAccent),
+                      style: const TextStyle(color: Colors.black87, fontSize: 13),
+                      items: _classOptions.map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c, overflow: TextOverflow.ellipsis),
+                      )).toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          _selectedClass = v;
+                          _applyFilters();
+                        }
+                      },
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
-                  SizedBox(
-                    width: double.infinity,
-
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-
-                        await Clipboard.setData(
-                          ClipboardData(text: evaluationLink),
-                        );
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "Evaluation link copied successfully!",
+                ),
+                const SizedBox(width: 10),
+                // Status filter chips
+                ...[('All', Colors.blueGrey), ('Submitted', Colors.green), ('Pending', Colors.orange)]
+                    .map((entry) => Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: ChoiceChip(
+                            label: Text(entry.$1, style: const TextStyle(fontSize: 12)),
+                            selected: _selectedStatus == entry.$1,
+                            selectedColor: entry.$2.withOpacity(0.2),
+                            onSelected: (_) {
+                              _selectedStatus = entry.$1;
+                              _applyFilters();
+                            },
+                            labelStyle: TextStyle(
+                              color: _selectedStatus == entry.$1 ? entry.$2 : Colors.blueGrey,
+                              fontWeight: _selectedStatus == entry.$1
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
-                        );
-                      },
+                        )),
+              ],
+            ),
 
-                      icon: const Icon(Icons.copy_rounded),
+            const SizedBox(height: 16),
 
-                      label: const Text(
-                        "Copy Link",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
+            // ── Evaluation Link Card ─────────────
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.deepPurple.withOpacity(0.07),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.link_rounded, color: Colors.deepPurple),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      evaluationLink,
+                      style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+                      overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: evaluationLink));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Evaluation link copied!")),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    label: const Text('Copy', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(foregroundColor: Colors.deepPurple),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            Text(
-              'Class Roster (${_filteredStudents.length})',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
-            ),
-            const SizedBox(height: 10),
-            
-            // Student List
-            Expanded(
-              child: ListView.builder(
-                itemCount: _filteredStudents.length,
-                itemBuilder: (context, index) {
-                  final student = _filteredStudents[index];
-                  return Card(
-                    elevation: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.blueAccent.withOpacity(0.2),
-                        child: Text(student.name[0], style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-                      ),
-                      title: Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(
-                        student.hasSubmittedForm ? 'Evaluation: Submitted ✅' : 'Evaluation: Pending ⏳',
-                        style: TextStyle(
-                          color: student.hasSubmittedForm ? Colors.green : Colors.orange,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                      onTap: () {
-                        // Navigate to specific student's detail page
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => StudentDetailPage(student: student),
-                          ),
-                        );
-                      },
+            // ── Result count & class badge ─────────
+            Row(
+              children: [
+                Text(
+                  'Showing ${_pagedStudents.length} of ${_filteredStudents.length} reports',
+                  style: const TextStyle(fontSize: 13, color: Colors.blueGrey, fontWeight: FontWeight.w500),
+                ),
+                const Spacer(),
+                if (_selectedClass != 'All Classes')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  );
-                },
-              ),
+                    child: Text(
+                      _selectedClass,
+                      style: const TextStyle(
+                          color: Colors.blueAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // ── Student List ──────────────────────
+            Expanded(
+              child: _filteredStudents.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off_rounded, size: 56, color: Colors.grey.shade300),
+                          const SizedBox(height: 12),
+                          const Text('No students found',
+                              style: TextStyle(color: Colors.blueGrey, fontSize: 15)),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: _pagedStudents.length,
+                            itemBuilder: (context, index) {
+                              final student = _pagedStudents[index];
+                              return Card(
+                                elevation: 1.5,
+                                margin: const EdgeInsets.symmetric(vertical: 6),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14)),
+                                child: ListTile(
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  leading: CircleAvatar(
+                                    backgroundColor:
+                                        Colors.blueAccent.withOpacity(0.15),
+                                    child: Text(student.name[0],
+                                        style: const TextStyle(
+                                            color: Colors.blueAccent,
+                                            fontWeight: FontWeight.bold)),
+                                  ),
+                                  title: Text(student.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          if (student.className.isNotEmpty)
+                                            Container(
+                                              margin: const EdgeInsets.only(right: 8),
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 7, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blueAccent.withOpacity(0.10),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(student.className,
+                                                  style: const TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.blueAccent,
+                                                      fontWeight: FontWeight.bold)),
+                                            ),
+                                          Text(
+                                            student.hasSubmittedForm
+                                                ? 'Submitted ✅'
+                                                : 'Pending ⏳',
+                                            style: TextStyle(
+                                              color: student.hasSubmittedForm
+                                                  ? Colors.green
+                                                  : Colors.orange,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: const Icon(Icons.arrow_forward_ios,
+                                      size: 14, color: Colors.grey),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            StudentDetailPage(student: student),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        // ── Pagination ────────────────
+                        if (_totalPages > 1)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left_rounded),
+                                  onPressed: _currentPage > 0
+                                      ? () => setState(() => _currentPage--)
+                                      : null,
+                                  color: Colors.blueAccent,
+                                ),
+                                ...List.generate(_totalPages, (i) => GestureDetector(
+                                  onTap: () => setState(() => _currentPage = i),
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: _currentPage == i
+                                          ? Colors.blueAccent
+                                          : Colors.blueAccent.withOpacity(0.10),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Center(
+                                      child: Text('${i + 1}',
+                                          style: TextStyle(
+                                            color: _currentPage == i
+                                                ? Colors.white
+                                                : Colors.blueAccent,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          )),
+                                    ),
+                                  ),
+                                )),
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded),
+                                  onPressed: _currentPage < _totalPages - 1
+                                      ? () => setState(() => _currentPage++)
+                                      : null,
+                                  color: Colors.blueAccent,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
             ),
           ],
         ),

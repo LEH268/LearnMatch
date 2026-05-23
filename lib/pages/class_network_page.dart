@@ -82,7 +82,6 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
       visibleEdges = [];
 
       if (_focusedTeacherId == null && _expandedClassIds.isEmpty) {
-        // Default: show class + teacher nodes only
         visibleNodes = _allNodes
             .where((n) =>
                 n.type == NodeType.classNode ||
@@ -90,7 +89,6 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
             .toList();
 
       } else if (_focusedTeacherId == null && _expandedClassIds.isNotEmpty) {
-        // Expanded class view
         final expandedClassNodes = _allNodes.where(
           (n) => n.type == NodeType.classNode && _expandedClassIds.contains(n.id),
         ).toList();
@@ -115,7 +113,6 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
         ));
 
       } else if (_focusedTeacherId != null) {
-        // Focused teacher view
         final focusedNode =
             _allNodes.firstWhere((n) => n.id == _focusedTeacherId);
         final teacher = focusedNode.data as Teacher;
@@ -131,7 +128,6 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
 
         visibleNodes.addAll(teacherClassNodes);
 
-        // Also show students if their class is expanded
         for (final classId in _expandedClassIds) {
           final classMatches =
               _allNodes.where((n) => n.id == classId).toList();
@@ -148,7 +144,6 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
         }
       }
 
-      // Filter edges: both endpoints must be visible
       final visibleIds = visibleNodes.map((n) => n.id).toSet();
       visibleEdges = _allEdges
           .where((e) =>
@@ -178,6 +173,141 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
     } else if (node.type == NodeType.studentNode) {
       _showStudentProfile(node.data as Student);
     }
+  }
+
+  // ── Add Teacher Dialog ─────────────────────────────
+  void _showAddTeacherDialog() {
+    final nameCtrl = TextEditingController();
+    final subjectCtrl = TextEditingController();
+    final List<String> selectedClasses = [];
+    final classNames = _classes.map((c) => c.className).toList();
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.school_rounded, color: Colors.orange),
+              ),
+              const SizedBox(width: 12),
+              const Text('Add Teacher',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: SizedBox(
+            width: 380,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _dialogTextField(nameCtrl, 'Teacher Name', Icons.person_rounded),
+                  const SizedBox(height: 12),
+                  _dialogTextField(subjectCtrl, 'Subject(s) e.g. Math, Science', Icons.book_rounded),
+                  const SizedBox(height: 16),
+                  const Text('Assign to Classes:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  if (classNames.isEmpty)
+                    const Text('No classes created yet.',
+                        style: TextStyle(color: Colors.blueGrey, fontSize: 13))
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: classNames.map((c) {
+                        final selected = selectedClasses.contains(c);
+                        return FilterChip(
+                          label: Text(c,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: selected ? Colors.white : Colors.black87,
+                                  fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
+                          selected: selected,
+                          selectedColor: Colors.orange,
+                          backgroundColor: Colors.grey.shade100,
+                          onSelected: (v) {
+                            setDialogState(() {
+                              if (v) {
+                                selectedClasses.add(c);
+                              } else {
+                                selectedClasses.remove(c);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                final subjects = subjectCtrl.text
+                    .split(',')
+                    .map((s) => s.trim())
+                    .where((s) => s.isNotEmpty)
+                    .toList();
+                await FirebaseFirestore.instance.collection('teachers').add({
+                  'name': name,
+                  'subjects': subjects,
+                  'classesTaught': selectedClasses,
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Add Teacher',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogTextField(
+      TextEditingController ctrl, String hint, IconData icon) {
+    return TextField(
+      controller: ctrl,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(icon, size: 18),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+      ),
+    );
   }
 
   // ── Student profile dialog ─────────────────────────
@@ -215,24 +345,13 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
           child: SingleChildScrollView(
             child: Column(
               children: [
-                // VARK Scores
                 if (student.varkScores.isNotEmpty)
-                  _buildScoreCard(
-                    'VARK Learning Style',
-                    student.varkScores,
-                    Colors.deepPurple,
-                  ),
+                  _buildScoreCard('VARK Learning Style', student.varkScores, Colors.deepPurple),
                 const SizedBox(height: 16),
-                // Personality Scores
                 if (student.personalityScores.isNotEmpty)
-                  _buildScoreCard(
-                    'Personality Profile',
-                    student.personalityScores,
-                    Colors.teal,
-                  ),
+                  _buildScoreCard('Personality Profile', student.personalityScores, Colors.teal),
                 const SizedBox(height: 16),
-                _buildProfileRow(
-                    Icons.phone, 'Emergency Contact', student.emergencyContact),
+                _buildProfileRow(Icons.phone, 'Emergency Contact', student.emergencyContact),
               ],
             ),
           ),
@@ -247,8 +366,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
     );
   }
 
-  Widget _buildScoreCard(
-      String title, Map<String, int> scores, Color color) {
+  Widget _buildScoreCard(String title, Map<String, int> scores, Color color) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -261,9 +379,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
         children: [
           Text(title,
               style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                  fontSize: 15)),
+                  fontWeight: FontWeight.bold, color: color, fontSize: 15)),
           const SizedBox(height: 12),
           ...scores.entries.map((e) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -273,8 +389,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                         width: 32,
                         child: Text(e.key,
                             style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: color))),
+                                fontWeight: FontWeight.bold, color: color))),
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(6),
@@ -311,14 +426,69 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                 Text(title,
                     style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 4),
-                Text(value,
-                    style:
-                        const TextStyle(fontWeight: FontWeight.bold)),
+                Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // ── Legend panel ───────────────────────────────────
+  Widget _buildLegendPanel() {
+    return Positioned(
+      bottom: 24,
+      left: 16,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Legend',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            const SizedBox(height: 8),
+            _legendItem(Colors.orange, 'Teacher ↔ Class'),
+            const SizedBox(height: 6),
+            _legendItem(const Color(0xFF0066FF), 'Student ↔ Class'),
+            const SizedBox(height: 8),
+            const Text('Tap class node to expand',
+                style: TextStyle(fontSize: 10, color: Colors.blueGrey)),
+            const Text('Tap teacher to focus',
+                style: TextStyle(fontSize: 10, color: Colors.blueGrey)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 24,
+          height: 3,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+      ],
     );
   }
 
@@ -336,7 +506,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
         icon  = Icons.groups_rounded;
         break;
       case NodeType.teacherNode:
-        color = isFocused ? Colors.orangeAccent : Colors.orange;
+        color = isFocused ? Colors.deepOrange : Colors.orange;
         icon  = Icons.school_rounded;
         break;
       case NodeType.studentNode:
@@ -351,6 +521,9 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
+        border: isFocused
+            ? Border.all(color: color, width: 2.5)
+            : null,
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.22),
@@ -378,8 +551,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
               maxLines: 2,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 10),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
             ),
           ),
           if (node.type == NodeType.teacherNode)
@@ -391,6 +563,15 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                 style: TextStyle(fontSize: 8, color: Colors.grey.shade600),
               ),
             ),
+          if (node.type == NodeType.classNode)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                _expandedClassIds.contains(node.id) ? 'tap to collapse' : 'tap to expand',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 7, color: Colors.grey.shade400),
+              ),
+            ),
         ],
       ),
     );
@@ -399,7 +580,6 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
   // ── Build ──────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // Centre canvas on first frame
     if (!_isCanvasCentered) {
       final s = MediaQuery.of(context).size;
       _transformationController.value = Matrix4.identity()
@@ -420,16 +600,33 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
           'Class Intelligence Network',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          // Add Teacher button
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ElevatedButton.icon(
+              onPressed: _showAddTeacherDialog,
+              icon: const Icon(Icons.person_add_rounded, size: 18),
+              label: const Text('Add Teacher',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+            ),
+          ),
+        ],
       ),
 
-      // ── Firestore streams ────────────────────────────
       body: StreamBuilder<QuerySnapshot>(
         stream: _service.getStudentsStream(),
         builder: (context, studentSnap) {
           if (studentSnap.hasError) {
-            return Center(
-                child: Text('Error: ${studentSnap.error}',
-                    style: const TextStyle(color: Colors.red)));
+            return Center(child: Text('Error: ${studentSnap.error}'));
           }
           if (!studentSnap.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -444,7 +641,9 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
               className: d['className'] ?? 'Unassigned',
               varkScores: Map<String, int>.from(d['varkScores'] ?? {}),
               personalityScores:
-                  Map<String, int>.from(d['personalityScores'] ?? {}), grades: '', basicInfo: '', specialConditions: '', aiCognitiveAnalysis: '', aiAdaptivePath: '',
+                  Map<String, int>.from(d['personalityScores'] ?? {}),
+              grades: '', basicInfo: '', specialConditions: '',
+              aiCognitiveAnalysis: '', aiAdaptivePath: '',
             );
           }).toList();
 
@@ -452,9 +651,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
             stream: _service.getTeachersStream(),
             builder: (context, teacherSnap) {
               if (teacherSnap.hasError) {
-                return Center(
-                    child: Text('Error: ${teacherSnap.error}',
-                        style: const TextStyle(color: Colors.red)));
+                return Center(child: Text('Error: ${teacherSnap.error}'));
               }
               if (!teacherSnap.hasData) {
                 return const Center(child: CircularProgressIndicator());
@@ -474,9 +671,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                 stream: _service.getClassesStream(),
                 builder: (context, classSnap) {
                   if (classSnap.hasError) {
-                    return Center(
-                        child: Text('Error: ${classSnap.error}',
-                            style: const TextStyle(color: Colors.red)));
+                    return Center(child: Text('Error: ${classSnap.error}'));
                   }
                   if (!classSnap.hasData) {
                     return const Center(child: CircularProgressIndicator());
@@ -496,20 +691,44 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                           .map((c) => ClassGroup(className: c))
                           .toList();
 
-                  // Rebuild graph whenever data changes
                   _rebuildGraph(_students, _teachers, _classes);
 
                   if (_allNodes.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No data yet.\nAdd students via the assessment link first.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, color: Colors.blueGrey),
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.hub_outlined,
+                              size: 72, color: Colors.grey.shade300),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No data yet.\nCreate classes and run placement first.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 16, color: Colors.blueGrey),
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: _showAddTeacherDialog,
+                            icon: const Icon(Icons.person_add_rounded),
+                            label: const Text('Add a Teacher'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }
 
-                  return _buildCanvas();
+                  return Stack(
+                    children: [
+                      _buildCanvas(),
+                      _buildLegendPanel(),
+                    ],
+                  );
                 },
               );
             },
@@ -552,8 +771,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
               // Edges
               CustomPaint(
                 size: Size(canvasWidth, canvasHeight),
-                painter: EdgePainter(
-                    edges: visibleEdges, nodeSize: nodeSize),
+                painter: EdgePainter(edges: visibleEdges, nodeSize: nodeSize),
               ),
               // Nodes
               ...visibleNodes.map((node) {

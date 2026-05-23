@@ -8,7 +8,7 @@ class PlacementResult {
   final String studentId;
   final String studentName;
   final String assignedClass;
-  final String dominantStyle; // e.g. "Visual", "Auditory", etc.
+  final String dominantStyle;
   final Map<String, int> varkScores;
 
   PlacementResult({
@@ -27,7 +27,6 @@ class PlacementResult {
 class PlacementEngine {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // ── VARK key → readable name + class name ──────
   static const Map<String, String> _varkLabel = {
     'V': 'Visual',
     'A': 'Auditory',
@@ -35,21 +34,11 @@ class PlacementEngine {
     'K': 'Kinesthetic',
   };
 
-  static const Map<String, String> _varkClass = {
-    'V': 'Class V',
-    'A': 'Class A',
-    'R': 'Class R',
-    'K': 'Class K',
-  };
-
   // ── Determine dominant VARK style ──────────────
   static String getDominantStyle(Map<String, int> varkScores) {
-    if (varkScores.isEmpty) return 'V'; // default fallback
-
+    if (varkScores.isEmpty) return 'V';
     String dominant = 'V';
     int highest = -1;
-
-    // Priority order if tied: V > A > R > K
     for (final key in ['V', 'A', 'R', 'K']) {
       final score = varkScores[key] ?? 0;
       if (score > highest) {
@@ -57,97 +46,116 @@ class PlacementEngine {
         dominant = key;
       }
     }
-
     return dominant;
   }
 
-  // ── Run placement for ALL unassigned students ──
-  // Returns a list of PlacementResult for UI preview
-  Future<List<PlacementResult>> runPlacement() async {
+  // ── Assign student to best matching class from admin-created classes ──
+  // Logic: match dominant VARK letter to class name if possible,
+  // otherwise distribute evenly across available classes.
+  static String _assignToClass(
+    String dominant,
+    List<Map<String, dynamic>> classes,
+    Map<String, int> classCounts,
+  ) {
+    if (classes.isEmpty) return 'Unassigned';
+
+    // Try to find a class name containing the dominant VARK letter (e.g. "Class V", "Kelas A")
+    for (final c in classes) {
+      final name = (c['className'] as String).toUpperCase();
+      if (name.contains(' $dominant') || name.endsWith(dominant) || name.startsWith(dominant)) {
+        return c['className'] as String;
+      }
+    }
+
+    // Fallback: assign to class with fewest students (load balancing)
+    String minClass = classes.first['className'] as String;
+    int minCount = classCounts[minClass] ?? 0;
+    for (final c in classes) {
+      final name = c['className'] as String;
+      final count = classCounts[name] ?? 0;
+      if (count < minCount) {
+        minCount = count;
+        minClass = name;
+      }
+    }
+    return minClass;
+  }
+
+  // ── Preview placement WITHOUT saving ──────────
+  Future<List<PlacementResult>> previewPlacement(
+      List<Map<String, dynamic>> existingClasses) async {
     final snapshot = await _db.collection('students').get();
     final results = <PlacementResult>[];
+    final classCounts = <String, int>{};
 
-    // Track which classes are being created
-    final Set<String> classesCreated = {};
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final varkRaw = data['varkScores'];
+      if (varkRaw == null) continue;
+
+      final varkScores = Map<String, int>.from(varkRaw);
+      final dominant = getDominantStyle(varkScores);
+      final className = _assignToClass(dominant, existingClasses, classCounts);
+      classCounts[className] = (classCounts[className] ?? 0) + 1;
+
+      results.add(PlacementResult(
+        studentId: doc.id,
+        studentName: data['name'] ?? 'Unknown',
+        assignedClass: className,
+        dominantStyle: _varkLabel[dominant] ?? dominant,
+        varkScores: varkScores,
+      ));
+    }
+
+    return results;
+  }
+
+  // ── Run placement and SAVE to Firestore ────────
+  Future<List<PlacementResult>> runPlacement(
+      List<Map<String, dynamic>> existingClasses) async {
+    final snapshot = await _db.collection('students').get();
+    final results = <PlacementResult>[];
+    final classStudentMap = <String, List<String>>{};
+    final classCounts = <String, int>{};
 
     final WriteBatch batch = _db.batch();
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final varkRaw = data['varkScores'];
-
-      // Skip if no VARK data
       if (varkRaw == null) continue;
 
       final varkScores = Map<String, int>.from(varkRaw);
-      final dominant   = getDominantStyle(varkScores);
-      final className  = _varkClass[dominant]!;
-      final styleName  = _varkLabel[dominant]!;
+      final dominant = getDominantStyle(varkScores);
+      final className = _assignToClass(dominant, existingClasses, classCounts);
+      classCounts[className] = (classCounts[className] ?? 0) + 1;
+      classStudentMap.putIfAbsent(className, () => []).add(doc.id);
 
-      // 1. Update student's className in Firestore
       batch.update(doc.reference, {
-        'className':     className,
-        'dominantStyle': styleName,
-        'placedAt':      FieldValue.serverTimestamp(),
+        'className': className,
+        'dominantStyle': _varkLabel[dominant] ?? dominant,
+        'placedAt': FieldValue.serverTimestamp(),
       });
 
-      classesCreated.add(className);
-
       results.add(PlacementResult(
-        studentId:     doc.id,
-        studentName:   data['name'] ?? 'Unknown',
+        studentId: doc.id,
+        studentName: data['name'] ?? 'Unknown',
         assignedClass: className,
-        dominantStyle: styleName,
-        varkScores:    varkScores,
+        dominantStyle: _varkLabel[dominant] ?? dominant,
+        varkScores: varkScores,
       ));
     }
 
-    // 2. Commit all student updates at once
     await batch.commit();
 
-    // 3. Create / update each class document in 'classes' collection
-    for (final className in classesCreated) {
-      final varkKey  = _varkClass.entries
-          .firstWhere((e) => e.value == className)
-          .key;
-      final students = results
-          .where((r) => r.assignedClass == className)
-          .map((r) => r.studentId)
-          .toList();
-
-      await _db.collection('classes').doc(className).set({
-        'className':   className,
-        'learningStyle': _varkLabel[varkKey],
-        'studentIds':  students,
-        'studentCount': students.length,
-        'updatedAt':   FieldValue.serverTimestamp(),
+    // Update class documents with student counts
+    for (final entry in classStudentMap.entries) {
+      await _db.collection('classes').doc(entry.key).set({
+        'className': entry.key,
+        'studentIds': entry.value,
+        'studentCount': entry.value.length,
+        'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    }
-
-    return results;
-  }
-
-  // ── Preview placement WITHOUT saving ──────────
-  // Useful to show teacher a preview before confirming
-  Future<List<PlacementResult>> previewPlacement() async {
-    final snapshot = await _db.collection('students').get();
-    final results  = <PlacementResult>[];
-
-    for (final doc in snapshot.docs) {
-      final data    = doc.data();
-      final varkRaw = data['varkScores'];
-      if (varkRaw == null) continue;
-
-      final varkScores = Map<String, int>.from(varkRaw);
-      final dominant   = getDominantStyle(varkScores);
-
-      results.add(PlacementResult(
-        studentId:     doc.id,
-        studentName:   data['name'] ?? 'Unknown',
-        assignedClass: _varkClass[dominant]!,
-        dominantStyle: _varkLabel[dominant]!,
-        varkScores:    varkScores,
-      ));
     }
 
     return results;
