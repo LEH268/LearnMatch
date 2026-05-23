@@ -114,6 +114,24 @@ class HomePage extends StatelessWidget {
                   MaterialPageRoute(builder: (context) => const StudentFollowUpPage()),
                 ),
               ),
+              const SizedBox(height: 20),
+              
+              // Feature 4: Special Request Form
+              _buildFeatureCard(
+                context,
+                title: "Special Request 🧩",
+                description: "Submit student special needs or conditions to help create a supportive learning environment.",
+                iconData: Icons.health_and_safety_rounded,
+                color: const Color(0xFFEDE7F6), // light purple
+                accentColor: const Color(0xFF6A1B9A),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FeaturePage(title: "Special Request Form"),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
