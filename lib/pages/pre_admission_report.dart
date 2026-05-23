@@ -128,7 +128,6 @@ class _ReportPageState extends State<ReportPage> {
                       color: varkColors[topVark] ?? Colors.grey),
                   const SizedBox(width: 12),
                   Expanded(
-                    // 修正了未定义的变量名
                     child: Text(isLoadingAI ? "Generating AI insight..." : aiVarkInsight,
                         style: const TextStyle(
                             fontSize: 14, height: 1.5)),
@@ -250,10 +249,8 @@ class _ReportPageState extends State<ReportPage> {
         _calcPercent(widget.pScores['R']!, totalPR);
 
     try {
-      // 💡 获取学生名字，如果没填名字就用 "This student"
       String studentLabel = widget.studentName.isEmpty ? "This student" : widget.studentName;
 
-      // 重新调教 VARK AI prompt
       final varkPrompt = """
   Student VARK scores:
   Visual: $pV%
@@ -269,7 +266,6 @@ class _ReportPageState extends State<ReportPage> {
         Content.text(varkPrompt)
       ]);
 
-      // 重新调教 Personality AI prompt
       final personalityPrompt = """
   Student personality profile:
   Structured: $pS%

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // IMPORT: Firestore database
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'pre_admission_report.dart';
 
 class PreAdmissionTestPage extends StatefulWidget {
@@ -251,7 +251,7 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
     });
   }
 
-  // ASYNC FUNCTION: Save data to Firebase when the test is completed
+  // Save data to Firebase when the test is completed
   void _submitTest() async {
     try {
       // 1. Create a 'students' collection in Firestore and add this user's data
@@ -267,7 +267,7 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
           'Impulsivity': _impulsivityScore,
           'Reflectivity': _reflectivityScore,
         },
-        'testCompletedAt': FieldValue.serverTimestamp(), // Automatically record submission time
+        'testCompletedAt': FieldValue.serverTimestamp(),
       });
 
       // 2. Navigate to the report page ONLY after successful save

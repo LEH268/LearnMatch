@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // IMPORT: Firebase Auth
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -45,12 +45,12 @@ class _SignUpPageState extends State<SignUpPage> {
         password: password,
       );
 
-      // 🎉 Registration successful! Navigate directly to home page
+      // Registration successful. Navigate directly to home page
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       }
     } on FirebaseAuthException catch (e) {
-      // ❌ Catch specific registration errors
+      // Catch specific registration errors
       String errorMessage = "Sign up failed.";
       if (e.code == 'weak-password') {
         errorMessage = "The password provided is too weak.";

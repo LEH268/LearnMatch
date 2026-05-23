@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // IMPORT: Firebase Auth
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -30,19 +30,17 @@ class _LoginPageState extends State<LoginPage> {
 
     // 3. Try sending login request to Firebase
     try {
-      // This is a time-consuming operation, so use await
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
       
-      // 🎉 If it reaches here, login is successful! Navigate to home page
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/home');
       }
       
     } on FirebaseAuthException catch (e) {
-      // ❌ Catch specific error and show popup
+      // Catch specific error and show popup
       String errorMessage = "Login failed";
       if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
         errorMessage = "Incorrect email or password.";
@@ -123,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 16),
               
-              // NEW: Button to navigate to Sign Up Page
+              // Button to navigate to Sign Up Page
               TextButton(
                 onPressed: () {
                   Navigator.pushNamed(context, '/signup');
