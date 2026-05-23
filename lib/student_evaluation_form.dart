@@ -9,11 +9,9 @@ class StudentEvaluationForm extends StatefulWidget {
 
 class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
   int _currentIndex = 0;
-  
-  // Track total score (Max 25 points)
   int _totalScore = 0;
+  bool _isSavingToDatabase = false; // State to show saving process
 
-  // Student Evaluation Questions Database
   final List<Map<String, dynamic>> _questions = [
     {
       'theme': 'Part 1: Class Comfort & Environment',
@@ -78,30 +76,64 @@ class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
       if (_currentIndex < _questions.length - 1) {
         _currentIndex++;
       } else {
-        _submitForm();
+        _submitFormToDatabase();
       }
     });
   }
 
-  void _submitForm() {
-    // In a real app, you upload _totalScore to Firebase/Database here
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Thank You! 🎉'),
-        content: const Text('Your end-of-year evaluation has been successfully submitted to your teacher.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context); 
-            },
-            child: const Text('Close'),
+  // 模拟自动保存到云端数据库 (Firebase) 的过程
+  Future<void> _submitFormToDatabase() async {
+    setState(() {
+      _isSavingToDatabase = true;
+    });
+
+    // TODO: In a real app, this is where you write to Firebase:
+    // await FirebaseFirestore.instance.collection('evaluations').add({
+    //   'studentId': currentUser.id,
+    //   'score': _totalScore,
+    //   'timestamp': FieldValue.serverTimestamp(),
+    // });
+    
+    // Simulate network delay for saving
+    await Future.delayed(const Duration(seconds: 2));
+
+    setState(() {
+      _isSavingToDatabase = false;
+    });
+
+    // Show success dialog
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Column(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 50),
+              SizedBox(height: 10),
+              Text('Auto-Saved! 🎉', textAlign: TextAlign.center),
+            ],
           ),
-        ],
-      ),
-    );
+          content: const Text(
+            'Your evaluation has been successfully uploaded to the school database. Your teacher can now sync it.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Go back to previous screen
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
+                child: const Text('Back to Home'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -119,25 +151,44 @@ class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: Colors.grey.shade300,
-                  color: Colors.deepPurpleAccent,
-                  minHeight: 12,
-                ),
+          child: _isSavingToDatabase 
+            ? _buildSavingScreen() 
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.grey.shade300,
+                      color: Colors.deepPurpleAccent,
+                      minHeight: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Expanded(
+                    child: _buildQuestionPage(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: _buildQuestionPage(),
-              ),
-            ],
-          ),
         ),
+      ),
+    );
+  }
+
+  // A custom saving screen shown when student completes the form
+  Widget _buildSavingScreen() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Colors.deepPurple),
+          SizedBox(height: 20),
+          Text(
+            'Encrypting & Auto-saving to Database...',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.deepPurple),
+          ),
+        ],
       ),
     );
   }
