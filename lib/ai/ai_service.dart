@@ -2,7 +2,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 
 class AIService {
 
-  static const String apiKey = "AIzaSyBqV3HUncjyB41ACEyGW3qwVT_lOM_J018";
+  static const String apiKey = '';
 
   static final model = GenerativeModel(
     model: 'gemini-2.5-flash',
