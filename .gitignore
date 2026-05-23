@@ -43,3 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase
+.firebase/
+
+# Android build (fix existing gitignore)
+**/build/
+android/build/
