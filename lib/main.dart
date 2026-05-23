@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      // 保持 login page 为入口
+
       initialRoute: '/',
 
       routes: {

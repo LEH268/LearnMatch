@@ -1070,7 +1070,7 @@ class EdgePainter extends CustomPainter {
       final linePaint = Paint()
         ..color = isTeacherConnection
             ? Colors.orange.shade200
-            : Colors.white.withOpacity(0.78)
+            : const Color.fromARGB(255, 0, 102, 255).withOpacity(0.78)
         ..strokeWidth = 3.5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
