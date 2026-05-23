@@ -3,6 +3,7 @@ import 'pages/pre_admission_test.dart';
 import 'pages/class_network_page.dart'; 
 import 'pages/assessment_link_page.dart';
 import 'pages/student_follow_up_page.dart';
+import 'pages/special_request_link_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -115,7 +116,7 @@ class HomePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Feature 4: Special Request Form
               _buildFeatureCard(
                 context,
@@ -127,7 +128,7 @@ class HomePage extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const FeaturePage(title: "Special Request Form"),
+                    builder: (context) => const SpecialRequestLinkPage(),
                   ),
                 ),
               ),
