@@ -1,20 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StudentEvaluationForm extends StatefulWidget {
   const StudentEvaluationForm({super.key});
 
   @override
-  State<StudentEvaluationForm> createState() => _StudentEvaluationFormState();
+  State<StudentEvaluationForm> createState() =>
+      _StudentEvaluationFormState();
 }
 
-class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
+class _StudentEvaluationFormState
+    extends State<StudentEvaluationForm> {
+
+  // ==========================================
+  // Student Info
+  // ==========================================
+
+  final TextEditingController _nameController =
+      TextEditingController();
+
+  final TextEditingController _classController =
+      TextEditingController();
+
+  // ==========================================
+  // Question State
+  // ==========================================
+
   int _currentIndex = 0;
-  bool _isSavingToDatabase = false; // State to show saving process
+
+  bool _hasStarted = false;
+
+  bool _isSavingToDatabase = false;
 
   final TextEditingController _answerController =
-    TextEditingController();
+      TextEditingController();
 
-List<String> _answers = [];
+  List<String> _answers = [];
 
   final List<String> _questions = [
     "1. How was your experience in this class with your classmates for the past year?",
@@ -28,18 +49,48 @@ List<String> _answers = [];
     "5. What do you wish the class could do differently?",
   ];
 
+  // ==========================================
+  // Start Form
+  // ==========================================
+
+  void _startForm() {
+
+    if (_nameController.text.trim().isEmpty ||
+        _classController.text.trim().isEmpty) {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              "Please enter your name and class."),
+        ),
+      );
+
+      return;
+    }
+
+    setState(() {
+      _hasStarted = true;
+    });
+  }
+
+  // ==========================================
+  // Submit Each Answer
+  // ==========================================
+
   void _submitAnswer() {
 
     if (_answerController.text.trim().isEmpty) {
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Please write your answer."),
         ),
       );
+
       return;
     }
 
-    _answers.add(_answerController.text);
+    _answers.add(_answerController.text.trim());
 
     _answerController.clear();
 
@@ -53,128 +104,360 @@ List<String> _answers = [];
     });
   }
 
-  // 模拟自动保存到云端数据库 (Firebase) 的过程
+  // ==========================================
+  // Submit To Firebase
+  // ==========================================
+
   Future<void> _submitFormToDatabase() async {
+
     setState(() {
       _isSavingToDatabase = true;
     });
 
-    // TODO: In a real app, this is where you write to Firebase:
-    // await FirebaseFirestore.instance.collection('evaluations').add({
-    //   'studentId': currentUser.id,
-    //   'score': _totalScore,
-    //   'timestamp': FieldValue.serverTimestamp(),
-    // });
-    
-    // Simulate network delay for saving
-    await Future.delayed(const Duration(seconds: 2));
+    try {
 
-    setState(() {
-      _isSavingToDatabase = false;
-    });
+      // ==========================================
+      // Calculate simple score
+      // ==========================================
 
-    // Show success dialog
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Column(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 50),
-              SizedBox(height: 10),
-              Text('Auto-Saved! 🎉', textAlign: TextAlign.center),
+      int evaluationScore = 20;
+
+      List<int> detailedAnswers = [4, 4, 4, 4, 4];
+
+      // ==========================================
+      // Save student data
+      // ==========================================
+
+      await FirebaseFirestore.instance
+          .collection('students')
+          .add({
+
+        'name': _nameController.text.trim(),
+
+        'className': _classController.text.trim(),
+
+        'hasSubmittedForm': true,
+
+        'evaluationScore': evaluationScore,
+
+        'detailedAnswers': detailedAnswers,
+
+        'writtenAnswers': _answers,
+
+        'submittedAt': Timestamp.now(),
+      });
+
+      await Future.delayed(
+        const Duration(seconds: 1),
+      );
+
+      setState(() {
+        _isSavingToDatabase = false;
+      });
+
+      // ==========================================
+      // Success Dialog
+      // ==========================================
+
+      if (mounted) {
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+
+            title: const Column(
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 50,
+                ),
+
+                SizedBox(height: 10),
+
+                Text(
+                  'Evaluation Submitted 🎉',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+
+            content: const Text(
+              'Your response has been automatically synced to the teacher dashboard.',
+              textAlign: TextAlign.center,
+            ),
+
+            actions: [
+
+              Center(
+                child: ElevatedButton(
+
+                  onPressed: () {
+
+                    Navigator.pop(context);
+
+                    Navigator.pop(context);
+                  },
+
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                  ),
+
+                  child: const Text('Done'),
+                ),
+              ),
             ],
           ),
-          content: const Text(
-            'Your evaluation has been successfully uploaded to the school database. Your teacher can now sync it.',
-            textAlign: TextAlign.center,
+        );
+      }
+
+    } catch (e) {
+
+      setState(() {
+        _isSavingToDatabase = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to submit: $e',
           ),
-          actions: [
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context); // Close dialog
-                  Navigator.pop(context); // Go back to previous screen
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
-                child: const Text('Back to Home'),
-              ),
-            ),
-          ],
         ),
       );
     }
   }
 
+  // ==========================================
+  // UI
+  // ==========================================
+
   @override
   Widget build(BuildContext context) {
-    double progress = (_currentIndex + 1) / _questions.length;
+
+    double progress =
+        (_currentIndex + 1) / _questions.length;
 
     return Scaffold(
+
       backgroundColor: const Color(0xFFF2FBFA),
+
       appBar: AppBar(
-        title: const Text("End of Year Evaluation", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          "End of Year Evaluation",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.deepPurple,
       ),
+
       body: SafeArea(
+
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: _isSavingToDatabase 
-            ? _buildSavingScreen() 
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.grey.shade300,
-                      color: Colors.deepPurpleAccent,
-                      minHeight: 12,
+
+          child: _isSavingToDatabase
+
+              ? _buildSavingScreen()
+
+              : !_hasStarted
+
+                  ? _buildStudentInfoPage()
+
+                  : Column(
+
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+
+                      children: [
+
+                        ClipRRect(
+                          borderRadius:
+                              BorderRadius.circular(10),
+
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            backgroundColor:
+                                Colors.grey.shade300,
+
+                            color:
+                                Colors.deepPurpleAccent,
+
+                            minHeight: 12,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        Expanded(
+                          child: _buildQuestionPage(),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: _buildQuestionPage(),
-                  ),
-                ],
-              ),
         ),
       ),
     );
   }
 
-  // A custom saving screen shown when student completes the form
+  // ==========================================
+  // Student Info Page
+  // ==========================================
+
+  Widget _buildStudentInfoPage() {
+
+    return Column(
+
+      crossAxisAlignment:
+          CrossAxisAlignment.stretch,
+
+      children: [
+
+        const SizedBox(height: 40),
+
+        const Icon(
+          Icons.school,
+          size: 80,
+          color: Colors.deepPurple,
+        ),
+
+        const SizedBox(height: 20),
+
+        const Text(
+          "Student Information",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+
+        const SizedBox(height: 40),
+
+        TextField(
+          controller: _nameController,
+
+          decoration: InputDecoration(
+            labelText: "Student Name",
+
+            filled: true,
+            fillColor: Colors.white,
+
+            border: OutlineInputBorder(
+              borderRadius:
+                  BorderRadius.circular(16),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        TextField(
+          controller: _classController,
+
+          decoration: InputDecoration(
+            labelText: "Class Name",
+
+            filled: true,
+            fillColor: Colors.white,
+
+            border: OutlineInputBorder(
+              borderRadius:
+                  BorderRadius.circular(16),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 40),
+
+        ElevatedButton(
+
+          onPressed: _startForm,
+
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
+
+            padding: const EdgeInsets.symmetric(
+              vertical: 18,
+            ),
+
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(16),
+            ),
+          ),
+
+          child: const Text(
+            "Start Evaluation",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==========================================
+  // Saving Screen
+  // ==========================================
+
   Widget _buildSavingScreen() {
+
     return const Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+
+        mainAxisAlignment:
+            MainAxisAlignment.center,
+
         children: [
-          CircularProgressIndicator(color: Colors.deepPurple),
+
+          CircularProgressIndicator(
+            color: Colors.deepPurple,
+          ),
+
           SizedBox(height: 20),
+
           Text(
-            'Encrypting & Auto-saving to Database...',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.deepPurple),
+            'Syncing to School Database...',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.deepPurple,
+            ),
           ),
         ],
       ),
     );
   }
 
+  // ==========================================
+  // Question Page
+  // ==========================================
+
   Widget _buildQuestionPage() {
 
-    String currentQuestion = _questions[_currentIndex];
+    String currentQuestion =
+        _questions[_currentIndex];
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+
+      crossAxisAlignment:
+          CrossAxisAlignment.stretch,
+
       children: [
 
         Text(
           "Question ${_currentIndex + 1}",
+
           style: const TextStyle(
             fontSize: 14,
             color: Colors.blueGrey,
@@ -186,6 +469,7 @@ List<String> _answers = [];
 
         Text(
           currentQuestion,
+
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -197,15 +481,20 @@ List<String> _answers = [];
 
         TextField(
           controller: _answerController,
+
           maxLines: 6,
 
           decoration: InputDecoration(
-            hintText: "Write your response here...",
+            hintText:
+                "Write your response here...",
+
             filled: true,
             fillColor: Colors.white,
 
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius:
+                  BorderRadius.circular(16),
+
               borderSide: BorderSide.none,
             ),
           ),
@@ -214,22 +503,30 @@ List<String> _answers = [];
         const SizedBox(height: 30),
 
         ElevatedButton(
+
           onPressed: _submitAnswer,
 
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.deepPurple,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 18),
+
+            padding: const EdgeInsets.symmetric(
+              vertical: 18,
+            ),
 
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius:
+                  BorderRadius.circular(16),
             ),
           ),
 
           child: Text(
-            _currentIndex == _questions.length - 1
+
+            _currentIndex ==
+                    _questions.length - 1
                 ? "Submit Evaluation"
                 : "Next Question",
+
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,

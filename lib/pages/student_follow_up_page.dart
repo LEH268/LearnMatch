@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// 请确保这里的路径正确指向你的 firestore_service.dart
+import '../services/firestore_service.dart';
 
 // ==========================================
-// 1. Data Model (Simulating Database Records)
+// 1. Data Model 
 // ==========================================
 class StudentRecord {
   final String id;
@@ -10,7 +15,7 @@ class StudentRecord {
   final bool hasSubmittedForm;
   final int? evaluationScore;
   final List<int>? detailedAnswers;
-  final String className; // NEW: class the student belongs to
+  final String className;
 
   StudentRecord({
     required this.id,
@@ -33,24 +38,17 @@ class StudentFollowUpPage extends StatefulWidget {
 }
 
 class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
-
   final String evaluationLink =
-    "https://learnmatch-2b5c4.web.app/#/student-evaluation";
+      "https://learnmatch-2b5c4.web.app/#/student-evaluation";
 
-  // Simulated database
-  final List<StudentRecord> _allStudents = [
-    StudentRecord(id: 'S01', name: 'Alice Smith', hasSubmittedForm: true, evaluationScore: 23, detailedAnswers: [5, 4, 5, 4, 5], className: 'Class V'),
-    StudentRecord(id: 'S02', name: 'Bob Johnson', hasSubmittedForm: false, className: 'Class A'),
-    StudentRecord(id: 'S03', name: 'Charlie Brown', hasSubmittedForm: true, evaluationScore: 15, detailedAnswers: [3, 3, 3, 3, 3], className: 'Class V'),
-    StudentRecord(id: 'S04', name: 'Diana Prince', hasSubmittedForm: true, evaluationScore: 20, detailedAnswers: [4, 4, 5, 3, 4], className: 'Class R'),
-    StudentRecord(id: 'S05', name: 'Ethan Hunt', hasSubmittedForm: false, className: 'Class K'),
-    StudentRecord(id: 'S06', name: 'Fiona Green', hasSubmittedForm: true, evaluationScore: 18, detailedAnswers: [4, 3, 4, 3, 4], className: 'Class A'),
-    StudentRecord(id: 'S07', name: 'George King', hasSubmittedForm: false, className: 'Class R'),
-    StudentRecord(id: 'S08', name: 'Hannah Lee', hasSubmittedForm: true, evaluationScore: 22, detailedAnswers: [5, 4, 4, 5, 4], className: 'Class K'),
-  ];
+  // === Firebase 服务和数据流 ===
+  final FirestoreService _firestoreService = FirestoreService();
+  StreamSubscription<QuerySnapshot>? _studentsSubscription;
 
+  List<StudentRecord> _allStudents = [];
   List<StudentRecord> _filteredStudents = [];
   final TextEditingController _searchController = TextEditingController();
+  bool _isLoading = true;
 
   // ── Filter state ─────────────────────────────
   String _selectedClass = 'All Classes';
@@ -59,14 +57,66 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
   int _currentPage = 0;
 
   List<String> get _classOptions {
-    final classes = _allStudents.map((s) => s.className).toSet().toList()..sort();
+    final classes = _allStudents
+        .map((s) => s.className)
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
     return ['All Classes', ...classes];
   }
 
   @override
   void initState() {
     super.initState();
-    _applyFilters();
+    _fetchStudentsFromFirebase();
+  }
+
+  // === 核心逻辑：从 Firebase 实时拉取所有数据（加入安全解析） ===
+  void _fetchStudentsFromFirebase() {
+    _studentsSubscription = _firestoreService.getStudentsStream().listen((snapshot) {
+      final students = snapshot.docs.map((doc) {
+        // 1. 获取数据，防 null 处理
+        final data = doc.data() as Map<String, dynamic>? ?? {};
+
+        // 2. 极度安全的类型解析
+        return StudentRecord(
+          id: doc.id,
+          name: data['name']?.toString() ?? 'Unknown Student',
+          className: data['className']?.toString() ?? '',
+          hasSubmittedForm: data['hasSubmittedForm'] == true || data['hasSubmittedForm'] == 'true',
+          evaluationScore: int.tryParse(data['evaluationScore']?.toString() ?? ''),
+          detailedAnswers: (data['detailedAnswers'] as List<dynamic>?)
+              ?.map((e) => int.tryParse(e.toString()) ?? 0)
+              .toList(),
+        );
+      }).toList();
+
+      setState(() {
+        _allStudents = students;
+        _isLoading = false;
+
+        if (_selectedClass != 'All Classes' && !_classOptions.contains(_selectedClass)) {
+          _selectedClass = 'All Classes';
+        }
+
+        _applyFilters();
+      });
+    }, onError: (error) {
+      print("🔴 Firebase Error: $error");
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _studentsSubscription?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _applyFilters() {
@@ -129,7 +179,6 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
             // ── Filter Row ────────────────────────
             Row(
               children: [
-                // Class filter dropdown
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -144,10 +193,12 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
                       underline: const SizedBox(),
                       icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.blueAccent),
                       style: const TextStyle(color: Colors.black87, fontSize: 13),
-                      items: _classOptions.map((c) => DropdownMenuItem(
-                        value: c,
-                        child: Text(c, overflow: TextOverflow.ellipsis),
-                      )).toList(),
+                      items: _classOptions
+                          .map((c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c, overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
                       onChanged: (v) {
                         if (v != null) {
                           _selectedClass = v;
@@ -158,7 +209,6 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                // Status filter chips
                 ...[('All', Colors.blueGrey), ('Submitted', Colors.green), ('Pending', Colors.orange)]
                     .map((entry) => Padding(
                           padding: const EdgeInsets.only(left: 6),
@@ -172,9 +222,7 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
                             },
                             labelStyle: TextStyle(
                               color: _selectedStatus == entry.$1 ? entry.$2 : Colors.blueGrey,
-                              fontWeight: _selectedStatus == entry.$1
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                              fontWeight: _selectedStatus == entry.$1 ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
                         )),
@@ -243,10 +291,7 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
                     ),
                     child: Text(
                       _selectedClass,
-                      style: const TextStyle(
-                          color: Colors.blueAccent,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ),
               ],
@@ -255,148 +300,134 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
 
             // ── Student List ──────────────────────
             Expanded(
-              child: _filteredStudents.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off_rounded, size: 56, color: Colors.grey.shade300),
-                          const SizedBox(height: 12),
-                          const Text('No students found',
-                              style: TextStyle(color: Colors.blueGrey, fontSize: 15)),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _pagedStudents.length,
-                            itemBuilder: (context, index) {
-                              final student = _pagedStudents[index];
-                              return Card(
-                                elevation: 1.5,
-                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14)),
-                                child: ListTile(
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  leading: CircleAvatar(
-                                    backgroundColor:
-                                        Colors.blueAccent.withOpacity(0.15),
-                                    child: Text(student.name[0],
-                                        style: const TextStyle(
-                                            color: Colors.blueAccent,
-                                            fontWeight: FontWeight.bold)),
-                                  ),
-                                  title: Text(student.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const SizedBox(height: 2),
-                                      Row(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
+                  : _filteredStudents.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.search_off_rounded, size: 56, color: Colors.grey.shade300),
+                              const SizedBox(height: 12),
+                              const Text('No students found',
+                                  style: TextStyle(color: Colors.blueGrey, fontSize: 15)),
+                            ],
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: _pagedStudents.length,
+                                itemBuilder: (context, index) {
+                                  final student = _pagedStudents[index];
+                                  return Card(
+                                    elevation: 1.5,
+                                    margin: const EdgeInsets.symmetric(vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    child: ListTile(
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      leading: CircleAvatar(
+                                        backgroundColor: Colors.blueAccent.withOpacity(0.15),
+                                        child: Text(
+                                            student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
+                                            style: const TextStyle(
+                                                color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                                      ),
+                                      title: Text(student.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          if (student.className.isNotEmpty)
-                                            Container(
-                                              margin: const EdgeInsets.only(right: 8),
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 7, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.blueAccent.withOpacity(0.10),
-                                                borderRadius: BorderRadius.circular(6),
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              if (student.className.isNotEmpty)
+                                                Container(
+                                                  margin: const EdgeInsets.only(right: 8),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.blueAccent.withOpacity(0.10),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(student.className,
+                                                      style: const TextStyle(
+                                                          fontSize: 11,
+                                                          color: Colors.blueAccent,
+                                                          fontWeight: FontWeight.bold)),
+                                                ),
+                                              Text(
+                                                student.hasSubmittedForm ? 'Submitted ✅' : 'Pending ⏳',
+                                                style: TextStyle(
+                                                  color: student.hasSubmittedForm ? Colors.green : Colors.orange,
+                                                  fontWeight: FontWeight.w500,
+                                                  fontSize: 12,
+                                                ),
                                               ),
-                                              child: Text(student.className,
-                                                  style: const TextStyle(
-                                                      fontSize: 11,
-                                                      color: Colors.blueAccent,
-                                                      fontWeight: FontWeight.bold)),
-                                            ),
-                                          Text(
-                                            student.hasSubmittedForm
-                                                ? 'Submitted ✅'
-                                                : 'Pending ⏳',
-                                            style: TextStyle(
-                                              color: student.hasSubmittedForm
-                                                  ? Colors.green
-                                                  : Colors.orange,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 12,
-                                            ),
+                                            ],
                                           ),
                                         ],
                                       ),
-                                    ],
-                                  ),
-                                  trailing: const Icon(Icons.arrow_forward_ios,
-                                      size: 14, color: Colors.grey),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            StudentDetailPage(student: student),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-
-                        // ── Pagination ────────────────
-                        if (_totalPages > 1)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_left_rounded),
-                                  onPressed: _currentPage > 0
-                                      ? () => setState(() => _currentPage--)
-                                      : null,
-                                  color: Colors.blueAccent,
-                                ),
-                                ...List.generate(_totalPages, (i) => GestureDetector(
-                                  onTap: () => setState(() => _currentPage = i),
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: _currentPage == i
-                                          ? Colors.blueAccent
-                                          : Colors.blueAccent.withOpacity(0.10),
-                                      borderRadius: BorderRadius.circular(8),
+                                      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => StudentDetailPage(student: student),
+                                          ),
+                                        );
+                                      },
                                     ),
-                                    child: Center(
-                                      child: Text('${i + 1}',
-                                          style: TextStyle(
-                                            color: _currentPage == i
-                                                ? Colors.white
-                                                : Colors.blueAccent,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          )),
-                                    ),
-                                  ),
-                                )),
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_right_rounded),
-                                  onPressed: _currentPage < _totalPages - 1
-                                      ? () => setState(() => _currentPage++)
-                                      : null,
-                                  color: Colors.blueAccent,
-                                ),
-                              ],
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                      ],
-                    ),
+                            // ── Pagination ────────────────
+                            if (_totalPages > 1)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.chevron_left_rounded),
+                                      onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+                                      color: Colors.blueAccent,
+                                    ),
+                                    ...List.generate(
+                                        _totalPages,
+                                        (i) => GestureDetector(
+                                              onTap: () => setState(() => _currentPage = i),
+                                              child: Container(
+                                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                                width: 32,
+                                                height: 32,
+                                                decoration: BoxDecoration(
+                                                  color: _currentPage == i
+                                                      ? Colors.blueAccent
+                                                      : Colors.blueAccent.withOpacity(0.10),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Center(
+                                                  child: Text('${i + 1}',
+                                                      style: TextStyle(
+                                                        color: _currentPage == i ? Colors.white : Colors.blueAccent,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 13,
+                                                      )),
+                                                ),
+                                              ),
+                                            )),
+                                    IconButton(
+                                      icon: const Icon(Icons.chevron_right_rounded),
+                                      onPressed:
+                                          _currentPage < _totalPages - 1 ? () => setState(() => _currentPage++) : null,
+                                      color: Colors.blueAccent,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
             ),
           ],
         ),
@@ -424,7 +455,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   bool _isSyncing = false;
   bool _isDataFetched = false;
   int _fetchedStudentEvalScore = 0;
-  List<int> _fetchedDetailedAnswers = []; // To store the specific 5 answers
+  List<int> _fetchedDetailedAnswers = [];
 
   final List<String> _formQuestions = [
     'Part 1: Class Comfort & Environment',
@@ -468,11 +499,12 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   }
 
   Future<void> _fetchStudentEvaluation() async {
-    setState(() { _isSyncing = true; });
-    
-    // Simulating database fetch delay
+    setState(() {
+      _isSyncing = true;
+    });
+
     await Future.delayed(const Duration(seconds: 1));
-    
+
     setState(() {
       _isSyncing = false;
       if (widget.student.hasSubmittedForm) {
@@ -480,17 +512,19 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         _fetchedStudentEvalScore = widget.student.evaluationScore ?? 0;
         _fetchedDetailedAnswers = widget.student.detailedAnswers ?? [];
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully synced data for ${widget.student.name}.'), backgroundColor: Colors.green),
+          SnackBar(
+              content: Text('Successfully synced data for ${widget.student.name}.'), backgroundColor: Colors.green),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${widget.student.name} has not submitted the form yet.'), backgroundColor: Colors.redAccent),
+          SnackBar(
+              content: Text('${widget.student.name} has not submitted the form yet.'),
+              backgroundColor: Colors.redAccent),
         );
       }
     });
   }
 
-  // Show bottom sheet to display what the student actually filled in
   void _showStudentFormDetails() {
     showModalBottomSheet(
       context: context,
@@ -508,20 +542,24 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${widget.student.name}\'s Form Details', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+                  Text('${widget.student.name}\'s Form Details',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                 ],
               ),
               const Divider(),
               const SizedBox(height: 10),
               ...List.generate(_formQuestions.length, (index) {
-                int score = _fetchedDetailedAnswers.isNotEmpty ? _fetchedDetailedAnswers[index] : 0;
+                int score = _fetchedDetailedAnswers.isNotEmpty && index < _fetchedDetailedAnswers.length
+                    ? _fetchedDetailedAnswers[index]
+                    : 0;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_formQuestions[index], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                      Text(_formQuestions[index],
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -559,11 +597,15 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   String _simulateAIAnalysis(String comment) {
     if (comment.isEmpty) return "No teacher comment provided for AI analysis.";
     String lowerComment = comment.toLowerCase();
-    
-    if ((lowerComment.contains('excellent') || lowerComment.contains('good') || lowerComment.contains('great')) && 
+
+    if ((lowerComment.contains('excellent') ||
+            lowerComment.contains('good') ||
+            lowerComment.contains('great')) &&
         !(lowerComment.contains('struggle') || lowerComment.contains('poor'))) {
       return "AI Conclusion: Positive learning attitude. Grasps concepts easily.";
-    } else if (lowerComment.contains('struggle') || lowerComment.contains('hard') || lowerComment.contains('poor')) {
+    } else if (lowerComment.contains('struggle') ||
+        lowerComment.contains('hard') ||
+        lowerComment.contains('poor')) {
       return "AI Conclusion: Facing academic challenges. Requires pacing adjustments.";
     } else if (lowerComment.contains('improve') || lowerComment.contains('better')) {
       return "AI Conclusion: Showing gradual progress and positive development.";
@@ -573,11 +615,13 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
 
   void _generateReport() {
     if (_termGrades.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one term grade.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Please add at least one term grade.')));
       return;
     }
     if (!_isDataFetched && widget.student.hasSubmittedForm) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sync the student\'s data first.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Please sync the student\'s data first.')));
       return;
     }
 
@@ -652,7 +696,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
 
             // 2. Student Database Sync
             const Text('2. Sync Student Response', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Text('Pull data from the evaluation link submitted by the student.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const Text('Pull data from the evaluation link submitted by the student.',
+                style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(16),
@@ -667,8 +712,11 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Status: ${_isDataFetched ? 'Synced' : (widget.student.hasSubmittedForm ? 'Ready to Sync' : 'Not Submitted')}'),
-                            if (_isDataFetched) Text('Score: $_fetchedStudentEvalScore / 25', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+                            Text(
+                                'Status: ${_isDataFetched ? 'Synced' : (widget.student.hasSubmittedForm ? 'Ready to Sync' : 'Not Submitted')}'),
+                            if (_isDataFetched)
+                              Text('Score: $_fetchedStudentEvalScore / 25',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
                           ],
                         ),
                       ),
@@ -676,11 +724,15 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                         ElevatedButton(
                           onPressed: _isSyncing ? null : _fetchStudentEvaluation,
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
-                          child: _isSyncing ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Fetch'),
+                          child: _isSyncing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Fetch'),
                         ),
                     ],
                   ),
-          
                   if (_isDataFetched) ...[
                     const SizedBox(height: 12),
                     SizedBox(
@@ -690,9 +742,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                         icon: const Icon(Icons.visibility, color: Colors.deepPurple),
                         label: const Text('View Student\'s Submitted Form', style: TextStyle(color: Colors.deepPurple)),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.deepPurple),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-                        ),
+                            side: const BorderSide(color: Colors.deepPurple),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                       ),
                     )
                   ]
@@ -707,7 +758,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
             TextField(
               controller: _teacherCommentController,
               maxLines: 3,
-              decoration: const InputDecoration(hintText: 'Write observation for AI analysis...', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  hintText: 'Write observation for AI analysis...', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 30),
 
@@ -717,10 +769,13 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                 onPressed: _generateReport,
                 icon: const Icon(Icons.analytics),
                 label: const Text('Generate Final Report'),
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15), backgroundColor: Colors.green, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white),
               ),
             ),
-            const SizedBox(height: 30), // Added bottom padding
+            const SizedBox(height: 30),
           ],
         ),
       ),
@@ -762,27 +817,27 @@ class YearlyReportPage extends StatelessWidget {
           children: [
             const Icon(Icons.school, size: 60, color: Colors.deepPurple),
             const SizedBox(height: 10),
-            Text('AI Re-streaming Report\n$studentName', textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text('AI Re-streaming Report\n$studentName',
+                textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 30),
-
             Card(
               elevation: 3,
               child: ListTile(
-                title: const Text('Academic Performance', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+                title: const Text('Academic Performance',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
                 subtitle: Text('Average Score: ${averageGrade.toStringAsFixed(1)}/100\nFinal Grade: $gradeLetter'),
               ),
             ),
             const SizedBox(height: 10),
-
             Card(
               elevation: 3,
               child: ListTile(
-                title: const Text('Student Self-Evaluation', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+                title: const Text('Student Self-Evaluation',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
                 subtitle: Text(hasEvalData ? 'Satisfaction Score: $evaluationScore / 25' : 'No data submitted by student.'),
               ),
             ),
             const SizedBox(height: 10),
-
             Card(
               elevation: 3,
               color: Colors.blue.shade50,
@@ -799,7 +854,6 @@ class YearlyReportPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-
             Card(
               elevation: 3,
               color: Colors.green.shade50,
@@ -808,7 +862,8 @@ class YearlyReportPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Final Placement Recommendation', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                    const Text('Final Placement Recommendation',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
                     const SizedBox(height: 8),
                     Text(recommendation, style: const TextStyle(fontWeight: FontWeight.w500)),
                   ],
