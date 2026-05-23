@@ -449,7 +449,7 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
               aiAdaptivePath: d['aiAdaptivePath'] ?? '',
               varkScores: Map<String, int>.from(d['varkScores'] ?? {}),
               personalityScores:
-                  Map<String, int>.from(d['personalityScores'] ?? {}),
+                  Map<String, int>.from(d['personalityScores'] ?? {}), grades: '', basicInfo: '', specialConditions: '', aiCognitiveAnalysis: '', aiAdaptivePath: '',
             );
           }).toList();
 

@@ -1,5 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // IMPORT: Firebase Auth
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -15,16 +16,19 @@ class _SignUpPageState extends State<SignUpPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
+  final nameController = TextEditingController();
 
-  // Async function for Firebase Sign Up
-  void signUp() async {
-    // 1. Get input text and remove leading/trailing spaces
+  // =========================
+  // SIGN UP FUNCTION
+  // =========================
+  Future<void> signUp() async {
     final String email = emailController.text.trim();
     final String password = passwordController.text.trim();
     final String confirmPassword = confirmPasswordController.text.trim();
+    final String name = nameController.text.trim();
 
-    // 2. Validate inputs
-    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    // Validation
+    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill in all fields.")),
       );
@@ -38,34 +42,65 @@ class _SignUpPageState extends State<SignUpPage> {
       return;
     }
 
-    // 3. Try creating a new user in Firebase
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      // 1. Create Firebase Auth user
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // 🎉 Registration successful! Navigate directly to home page
+      final uid = credential.user!.uid;
+
+      // 2. Save user profile into Firestore (IMPORTANT)
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set({
+        'uid': uid,
+        'email': email,
+        'name': name,
+        'role': 'teacher', // default role
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // 3. Navigate to Home
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       }
+
     } on FirebaseAuthException catch (e) {
-      // ❌ Catch specific registration errors
-      String errorMessage = "Sign up failed.";
+      String message = "Sign up failed.";
+
       if (e.code == 'weak-password') {
-        errorMessage = "The password provided is too weak.";
+        message = "Password is too weak.";
       } else if (e.code == 'email-already-in-use') {
-        errorMessage = "An account already exists for that email.";
+        message = "Email already exists.";
       } else if (e.code == 'invalid-email') {
-        errorMessage = "Invalid email format.";
+        message = "Invalid email format.";
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
+          SnackBar(content: Text(message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Unexpected error: $e")),
         );
       }
     }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    nameController.dispose();
+    super.dispose();
   }
 
   @override
@@ -86,9 +121,23 @@ class _SignUpPageState extends State<SignUpPage> {
                   color: Color(0xFF0F9D58),
                 ),
               ),
+
               const SizedBox(height: 30),
-              
-              // Email Field
+
+              // Name
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: "Full Name",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Email
               TextField(
                 controller: emailController,
                 decoration: InputDecoration(
@@ -98,9 +147,10 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 16),
-              
-              // Password Field
+
+              // Password
               TextField(
                 controller: passwordController,
                 obscureText: obscurePassword,
@@ -121,9 +171,10 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 16),
 
-              // Confirm Password Field
+              // Confirm Password
               TextField(
                 controller: confirmPasswordController,
                 obscureText: obscureConfirm,
@@ -144,6 +195,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
 
               // Sign Up Button
@@ -161,13 +213,12 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 16),
 
-              // Navigate back to Login Button
+              // Back to Login
               TextButton(
-                onPressed: () {
-                  Navigator.pop(context); // Go back to the previous screen (Login)
-                },
+                onPressed: () => Navigator.pop(context),
                 child: const Text(
                   "Already have an account? Login",
                   style: TextStyle(color: Color(0xFF0F9D58)),
