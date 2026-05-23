@@ -8,19 +8,16 @@ class StudentFollowUpPage extends StatefulWidget {
 }
 
 class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
-  // Term Grades State
+  // 1. Term Grades State
   List<double> _termGrades = [];
   final TextEditingController _gradeController = TextEditingController();
 
-  // Student Evaluation State (Score 1 to 5)
-  Map<String, double> _evaluationScores = {
-    'Class Comfort & Environment': 3,
-    'Understanding of Materials': 3,
-    'Engagement & Participation': 3,
-    'Self-improvement Feeling': 3,
-  };
+  // 2. Database Sync State (Simulating fetching student's self-evaluation)
+  bool _isSyncing = false;
+  bool _isDataFetched = false;
+  int _fetchedStudentEvalScore = 0; // Max 25 points from the student link
 
-  // Teacher Comment State
+  // 3. Teacher Comment State
   final TextEditingController _teacherCommentController = TextEditingController();
 
   // Helper Methods for Grades
@@ -58,8 +55,20 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
     return 'F';
   }
 
-  double _calculateTotalEvaluationScore() {
-    return _evaluationScores.values.fold(0, (prev, element) => prev + element);
+  // Simulate fetching data from Firebase/Backend
+  Future<void> _fetchStudentEvaluation() async {
+    setState(() {
+      _isSyncing = true;
+    });
+    
+    // Simulate network delay
+    await Future.delayed(const Duration(seconds: 2));
+    
+    setState(() {
+      _isSyncing = false;
+      _isDataFetched = true;
+      _fetchedStudentEvalScore = 22; // Simulated score retrieved from database (out of 25)
+    });
   }
 
   // Simulated AI Logic for Teacher's Comment
@@ -68,7 +77,6 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
     
     String lowerComment = comment.toLowerCase();
     
-    // In a real application, you would send this to an AI API (e.g., Gemini).
     if ((lowerComment.contains('excellent') || lowerComment.contains('good') || lowerComment.contains('great')) && 
         !(lowerComment.contains('struggle') || lowerComment.contains('poor'))) {
       return "AI Conclusion: The student exhibits a highly positive learning attitude and grasps concepts easily.";
@@ -84,21 +92,26 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
   void _generateReport() {
     if (_termGrades.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one term grade before generating the report.')),
+        const SnackBar(content: Text('Please add at least one term grade.')),
+      );
+      return;
+    }
+    if (!_isDataFetched) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sync the student\'s self-evaluation data first.')),
       );
       return;
     }
 
     double avgGrade = _calculateAverageGrade();
     String gradeLetter = _getGradeLetter(avgGrade);
-    double totalEval = _calculateTotalEvaluationScore();
     String aiAnalysis = _simulateAIAnalysis(_teacherCommentController.text);
 
-    // Generate Final Recommendation
+    // Generate Final Recommendation (Max Grade: 100, Max Eval: 25)
     String finalRecommendation = "";
-    if (avgGrade >= 75 && totalEval >= 15) {
-      finalRecommendation = "The student is highly suitable for this class. They are excelling academically and feel comfortable in this environment. No class change is needed.";
-    } else if (avgGrade < 60 || totalEval < 10) {
+    if (avgGrade >= 75 && _fetchedStudentEvalScore >= 20) {
+      finalRecommendation = "The student is highly suitable for this class. They are excelling academically and feel extremely comfortable in this environment. No class change is needed.";
+    } else if (avgGrade < 60 || _fetchedStudentEvalScore < 12) {
       finalRecommendation = "The student is struggling either academically or socially. It is highly recommended to consider transferring them to a different class format or providing dedicated tutoring.";
     } else {
       finalRecommendation = "The student fits reasonably well in this class. Standard monitoring is advised for the next year.";
@@ -111,7 +124,7 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
         builder: (context) => YearlyReportPage(
           averageGrade: avgGrade,
           gradeLetter: gradeLetter,
-          evaluationScore: totalEval,
+          evaluationScore: _fetchedStudentEvalScore,
           aiAnalysis: aiAnalysis,
           recommendation: finalRecommendation,
         ),
@@ -132,7 +145,7 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. Term Grades Section
-            const Text('1. Term Grades', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('1. Term Grades Input', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -169,33 +182,52 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
             ),
             const Divider(height: 30, thickness: 2),
 
-            // 2. Student Evaluation Form Section
-            const Text('2. End of Year Student Evaluation', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const Text('Rate from 1 (Poor) to 5 (Excellent)', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 10),
-            ..._evaluationScores.keys.map((key) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // 2. Student Evaluation Data Fetch Section
+            const Text('2. Student Self-Evaluation Data', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('Sync the feedback form submitted by the student.', style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.deepPurple.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.deepPurple.shade200),
+              ),
+              child: Row(
                 children: [
-                  Text(key, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Slider(
-                    value: _evaluationScores[key]!,
-                    min: 1,
-                    max: 5,
-                    divisions: 4,
-                    label: _evaluationScores[key]!.round().toString(),
-                    onChanged: (value) {
-                      setState(() {
-                        _evaluationScores[key] = value;
-                      });
-                    },
+                  const Icon(Icons.assignment_turned_in, color: Colors.deepPurple, size: 40),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Form Status:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          _isDataFetched ? 'Data Synced Successfully' : 'Not Synced Yet',
+                          style: TextStyle(color: _isDataFetched ? Colors.green : Colors.redAccent),
+                        ),
+                        if (_isDataFetched)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              'Score Received: $_fetchedStudentEvalScore / 25',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
+                  if (!_isDataFetched)
+                    ElevatedButton.icon(
+                      onPressed: _isSyncing ? null : _fetchStudentEvaluation,
+                      icon: _isSyncing 
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
+                          : const Icon(Icons.sync),
+                      label: Text(_isSyncing ? 'Syncing...' : 'Fetch Data'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
+                    ),
                 ],
-              );
-            }).toList(),
-            Text(
-              'Current Evaluation Score: ${_calculateTotalEvaluationScore().round()} / 20',
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+              ),
             ),
             const Divider(height: 40, thickness: 2),
 
@@ -221,6 +253,7 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                   backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
                 ),
               ),
             ),
@@ -239,7 +272,7 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
 class YearlyReportPage extends StatelessWidget {
   final double averageGrade;
   final String gradeLetter;
-  final double evaluationScore;
+  final int evaluationScore;
   final String aiAnalysis;
   final String recommendation;
 
@@ -301,7 +334,7 @@ class YearlyReportPage extends StatelessWidget {
                   children: [
                     const Text('Student Self-Evaluation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
                     const SizedBox(height: 10),
-                    Text('Total Satisfaction Score: ${evaluationScore.round()} / 20', style: const TextStyle(fontSize: 16)),
+                    Text('Total Satisfaction Score: $evaluationScore / 25', style: const TextStyle(fontSize: 16)),
                   ],
                 ),
               ),
