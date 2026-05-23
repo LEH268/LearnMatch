@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pre_admission_test.dart';
+import 'class_network_page.dart'; // Added the import for the new Class Network Page
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -83,6 +84,7 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 20),
 
               // Feature 2: Learning Intelligence Network (Analytics)
+              // This now navigates to the new ClassNetworkPage!
               _buildFeatureCard(
                 context,
                 title: "Student Intelligence 🕸️",
@@ -92,7 +94,7 @@ class HomePage extends StatelessWidget {
                 accentColor: Colors.blue,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const FeaturePage(title: "Intelligence Network Dashboard")),
+                  MaterialPageRoute(builder: (context) => const ClassNetworkPage()),
                 ),
               ),
               const SizedBox(height: 20),
@@ -201,6 +203,7 @@ class HomePage extends StatelessWidget {
   }
 }
 
+// Placeholder for other features
 class FeaturePage extends StatelessWidget {
   final String title;
   const FeaturePage({super.key, required this.title});
