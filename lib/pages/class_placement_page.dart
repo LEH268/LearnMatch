@@ -416,7 +416,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
               color: color.withOpacity(0.10),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text('$count stds', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+            child: Text('$count students', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 4),
           IconButton(
