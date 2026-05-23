@@ -276,6 +276,7 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
           context,
           MaterialPageRoute(
             builder: (context) => ReportPage(
+              studentName: _studentName,
               varkScores: _varkScores,
               pScores: {
                 'S': _structuredScore,

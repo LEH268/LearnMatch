@@ -1,4 +1,5 @@
-import 'dart:ui';
+import 'dart:math';
+import 'package:flutter/material.dart';
 
 import '../models/graph_node.dart';
 import '../models/graph_edge.dart';
@@ -7,49 +8,87 @@ import '../models/teacher.dart';
 import '../models/class_group.dart';
 
 class GraphRepository {
-
   static List<GraphNode> buildNodes(
     List<Student> students,
     List<Teacher> teachers,
     List<ClassGroup> classes,
   ) {
     final nodes = <GraphNode>[];
+    final random = Random();
 
-    // CLASSES
-    for (var c in classes) {
+    final double canvasCenterX = 1600;
+    final double canvasCenterY = 1600;
+
+    // ── CLASS NODES ────────────────────────────────────
+    for (int i = 0; i < classes.length; i++) {
+      final angle = (2 * pi * i) / classes.length;
+      final radius = 520.0;
+
       nodes.add(GraphNode(
-        id: c.className,
-        label: c.className,
+        id: 'CLASS_${classes[i].className}',
+        label: classes[i].className,
         type: NodeType.classNode,
-        data: c,
-        position: const Offset(0, 0),
-        randomPhase: 0,
+        data: classes[i],
+        position: Offset(
+          canvasCenterX + cos(angle) * radius,
+          canvasCenterY + sin(angle) * radius,
+        ),
+        randomPhase: random.nextDouble() * pi * 2,
       ));
     }
 
-    // TEACHERS
-    for (var t in teachers) {
+    // ── TEACHER NODES ──────────────────────────────────
+    for (int i = 0; i < teachers.length; i++) {
+      final angle = (2 * pi * i) / teachers.length - pi / 2;
+      final radius = 280.0;
+
       nodes.add(GraphNode(
-        id: t.id,
-        label: t.name,
+        id: teachers[i].id,
+        label: teachers[i].name,
         type: NodeType.teacherNode,
-        data: t,
-        position: const Offset(0, 0),
-        randomPhase: 0,
+        data: teachers[i],
+        position: Offset(
+          canvasCenterX + cos(angle) * radius,
+          canvasCenterY + sin(angle) * radius,
+        ),
+        randomPhase: random.nextDouble() * pi * 2,
       ));
     }
 
-    // STUDENTS
+    // ── STUDENT NODES ──────────────────────────────────
+    // Group by className
+    final Map<String, List<Student>> grouped = {};
     for (var s in students) {
-      nodes.add(GraphNode(
-        id: s.id,
-        label: s.name,
-        type: NodeType.studentNode,
-        data: s,
-        position: const Offset(0, 0),
-        randomPhase: 0,
-      ));
+      grouped.putIfAbsent(s.className, () => []).add(s);
     }
+
+    grouped.forEach((className, studentList) {
+      // Find the parent class node
+      final classNodeMatches = nodes.where(
+        (n) => n.type == NodeType.classNode && n.label == className,
+      ).toList();
+
+      if (classNodeMatches.isEmpty) return;
+      final classNode = classNodeMatches.first;
+
+      for (int i = 0; i < studentList.length; i++) {
+        final angle = (2 * pi * i) / studentList.length;
+        final radius = 260 + random.nextInt(80).toDouble();
+
+        nodes.add(GraphNode(
+          id: studentList[i].id,
+          label: studentList[i].name,
+          type: NodeType.studentNode,
+          data: studentList[i],
+          position: classNode.position +
+              Offset(
+                cos(angle) * radius,
+                sin(angle) * radius,
+              ),
+          randomPhase: random.nextDouble() * pi * 2,
+        ));
+      }
+    });
 
     return nodes;
   }
@@ -57,20 +96,28 @@ class GraphRepository {
   static List<GraphEdge> buildEdges(List<GraphNode> nodes) {
     final edges = <GraphEdge>[];
 
-    final classNodes = nodes.where((n) => n.type == NodeType.classNode);
-    final studentNodes = nodes.where((n) => n.type == NodeType.studentNode);
+    final classNodes = nodes.where((n) => n.type == NodeType.classNode).toList();
+    final teacherNodes = nodes.where((n) => n.type == NodeType.teacherNode).toList();
+    final studentNodes = nodes.where((n) => n.type == NodeType.studentNode).toList();
 
-    for (var s in studentNodes) {
-      final student = s.data as Student;
+    // Student → Class edges
+    for (var sNode in studentNodes) {
+      final student = sNode.data as Student;
+      final classMatches = classNodes.where((c) => c.label == student.className).toList();
+      if (classMatches.isNotEmpty) {
+        edges.add(GraphEdge(source: classMatches.first, target: sNode));
+      }
+    }
 
-      final classNode = classNodes.firstWhere(
-        (c) => c.label == student.className,
-      );
-
-      edges.add(GraphEdge(
-        source: classNode,
-        target: s,
-      ));
+    // Teacher → Class edges
+    for (var tNode in teacherNodes) {
+      final teacher = tNode.data as Teacher;
+      for (var className in teacher.classesTaught) {
+        final classMatches = classNodes.where((c) => c.label == className).toList();
+        if (classMatches.isNotEmpty) {
+          edges.add(GraphEdge(source: tNode, target: classMatches.first));
+        }
+      }
     }
 
     return edges;
