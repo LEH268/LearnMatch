@@ -9,23 +9,7 @@ class StudentEvaluationForm extends StatefulWidget {
       _StudentEvaluationFormState();
 }
 
-class _StudentEvaluationFormState
-    extends State<StudentEvaluationForm> {
-
-  // ==========================================
-  // Student Info
-  // ==========================================
-
-  final TextEditingController _nameController =
-      TextEditingController();
-
-  final TextEditingController _classController =
-      TextEditingController();
-
-  // ==========================================
-  // Question State
-  // ==========================================
-
+class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
   int _currentIndex = 0;
 
   bool _hasStarted = false;
@@ -33,52 +17,19 @@ class _StudentEvaluationFormState
   bool _isSavingToDatabase = false;
 
   final TextEditingController _answerController =
-      TextEditingController();
+    TextEditingController();
 
-  List<String> _answers = [];
+List<String> _answers = [];
 
   final List<String> _questions = [
     "1. How was your experience in this class with your classmates for the past year?",
-
     "2. How was your experience in this class with your teachers for the past year?",
-
     "3. What has been the highlight throughout the year?",
-
     "4. Would you like to stay in this class? Why or why not?",
-
     "5. What do you wish the class could do differently?",
   ];
 
-  // ==========================================
-  // Start Form
-  // ==========================================
-
-  void _startForm() {
-
-    if (_nameController.text.trim().isEmpty ||
-        _classController.text.trim().isEmpty) {
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              "Please enter your name and class."),
-        ),
-      );
-
-      return;
-    }
-
-    setState(() {
-      _hasStarted = true;
-    });
-  }
-
-  // ==========================================
-  // Submit Each Answer
-  // ==========================================
-
   void _submitAnswer() {
-
     if (_answerController.text.trim().isEmpty) {
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,12 +41,11 @@ class _StudentEvaluationFormState
       return;
     }
 
-    _answers.add(_answerController.text.trim());
+    _answers.add(_answerController.text);
 
     _answerController.clear();
 
     setState(() {
-
       if (_currentIndex < _questions.length - 1) {
         _currentIndex++;
       } else {
@@ -104,52 +54,22 @@ class _StudentEvaluationFormState
     });
   }
 
-  // ==========================================
-  // Submit To Firebase
-  // ==========================================
-
+  // 模拟自动保存到云端数据库 (Firebase) 的过程
   Future<void> _submitFormToDatabase() async {
 
     setState(() {
       _isSavingToDatabase = true;
     });
 
-    try {
-
-      // ==========================================
-      // Calculate simple score
-      // ==========================================
-
-      int evaluationScore = 20;
-
-      List<int> detailedAnswers = [4, 4, 4, 4, 4];
-
-      // ==========================================
-      // Save student data
-      // ==========================================
-
-      await FirebaseFirestore.instance
-          .collection('students')
-          .add({
-
-        'name': _nameController.text.trim(),
-
-        'className': _classController.text.trim(),
-
-        'hasSubmittedForm': true,
-
-        'evaluationScore': evaluationScore,
-
-        'detailedAnswers': detailedAnswers,
-
-        'writtenAnswers': _answers,
-
-        'submittedAt': Timestamp.now(),
-      });
-
-      await Future.delayed(
-        const Duration(seconds: 1),
-      );
+    // TODO: In a real app, this is where you write to Firebase:
+    // await FirebaseFirestore.instance.collection('evaluations').add({
+    //   'studentId': currentUser.id,
+    //   'score': _totalScore,
+    //   'timestamp': FieldValue.serverTimestamp(),
+    // });
+    
+    // Simulate network delay for saving
+    await Future.delayed(const Duration(seconds: 2));
 
       setState(() {
         _isSavingToDatabase = false;
@@ -262,154 +182,32 @@ class _StudentEvaluationFormState
 
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-
-          child: _isSavingToDatabase
-
-              ? _buildSavingScreen()
-
-              : !_hasStarted
-
-                  ? _buildStudentInfoPage()
-
-                  : Column(
-
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-
-                      children: [
-
-                        ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(10),
-
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            backgroundColor:
-                                Colors.grey.shade300,
-
-                            color:
-                                Colors.deepPurpleAccent,
-
-                            minHeight: 12,
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        Expanded(
-                          child: _buildQuestionPage(),
-                        ),
-                      ],
+          child: _isSavingToDatabase 
+            ? _buildSavingScreen() 
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.grey.shade300,
+                      color: Colors.deepPurpleAccent,
+                      minHeight: 12,
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  Expanded(
+                    child: _buildQuestionPage(),
+                  ),
+                ],
+              ),
         ),
       ),
     );
   }
 
-  // ==========================================
-  // Student Info Page
-  // ==========================================
-
-  Widget _buildStudentInfoPage() {
-
-    return Column(
-
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
-
-      children: [
-
-        const SizedBox(height: 40),
-
-        const Icon(
-          Icons.school,
-          size: 80,
-          color: Colors.deepPurple,
-        ),
-
-        const SizedBox(height: 20),
-
-        const Text(
-          "Student Information",
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-
-        const SizedBox(height: 40),
-
-        TextField(
-          controller: _nameController,
-
-          decoration: InputDecoration(
-            labelText: "Student Name",
-
-            filled: true,
-            fillColor: Colors.white,
-
-            border: OutlineInputBorder(
-              borderRadius:
-                  BorderRadius.circular(16),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        TextField(
-          controller: _classController,
-
-          decoration: InputDecoration(
-            labelText: "Class Name",
-
-            filled: true,
-            fillColor: Colors.white,
-
-            border: OutlineInputBorder(
-              borderRadius:
-                  BorderRadius.circular(16),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 40),
-
-        ElevatedButton(
-
-          onPressed: _startForm,
-
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.deepPurple,
-            foregroundColor: Colors.white,
-
-            padding: const EdgeInsets.symmetric(
-              vertical: 18,
-            ),
-
-            shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(16),
-            ),
-          ),
-
-          child: const Text(
-            "Start Evaluation",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ==========================================
-  // Saving Screen
-  // ==========================================
-
+  // A custom saving screen shown when student completes the form
   Widget _buildSavingScreen() {
 
     return const Center(
@@ -445,8 +243,7 @@ class _StudentEvaluationFormState
 
   Widget _buildQuestionPage() {
 
-    String currentQuestion =
-        _questions[_currentIndex];
+    String currentQuestion = _questions[_currentIndex];
 
     return Column(
 
@@ -454,7 +251,6 @@ class _StudentEvaluationFormState
           CrossAxisAlignment.stretch,
 
       children: [
-
         Text(
           "Question ${_currentIndex + 1}",
 
@@ -464,9 +260,7 @@ class _StudentEvaluationFormState
             fontWeight: FontWeight.bold,
           ),
         ),
-
         const SizedBox(height: 12),
-
         Text(
           currentQuestion,
 
@@ -476,21 +270,17 @@ class _StudentEvaluationFormState
             color: Colors.black87,
           ),
         ),
-
         const SizedBox(height: 30),
-
         TextField(
           controller: _answerController,
 
           maxLines: 6,
-
           decoration: InputDecoration(
             hintText:
                 "Write your response here...",
 
             filled: true,
             fillColor: Colors.white,
-
             border: OutlineInputBorder(
               borderRadius:
                   BorderRadius.circular(16),
@@ -499,27 +289,20 @@ class _StudentEvaluationFormState
             ),
           ),
         ),
-
         const SizedBox(height: 30),
-
         ElevatedButton(
 
           onPressed: _submitAnswer,
-
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.deepPurple,
             foregroundColor: Colors.white,
-
-            padding: const EdgeInsets.symmetric(
-              vertical: 18,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 18),
 
             shape: RoundedRectangleBorder(
               borderRadius:
                   BorderRadius.circular(16),
             ),
           ),
-
           child: Text(
 
             _currentIndex ==
