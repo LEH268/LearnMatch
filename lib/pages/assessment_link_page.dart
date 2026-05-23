@@ -185,35 +185,6 @@ class AssessmentLinkPage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
 
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(16),
-              ),
-
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-
-                  Icon(
-                    Icons.info_outline_rounded,
-                    color: Colors.orange,
-                  ),
-
-                  SizedBox(width: 12),
-
-                  Expanded(
-                    child: Text(
-                      "Tip: Once your app is deployed online, replace the localhost URL with your official web link so students can access it from any device.",
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.5,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
