@@ -23,7 +23,13 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
   Future<void> _runPlacement() async {
     setState(() => _isPlacing = true);
     try {
-      final results = await _engine.runPlacement();
+        // Load existing classes from Firestore to pass into the placement engine
+        final classSnap = await FirebaseFirestore.instance.collection('classes').get();
+        final existingClasses = classSnap.docs
+          .map((d) => {'className': d.data()['className'] ?? d.id, ...d.data()})
+          .toList();
+
+        final results = await _engine.runPlacement(existingClasses);
       if (!mounted) return;
 
       // Show summary dialog
