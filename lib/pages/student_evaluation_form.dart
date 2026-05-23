@@ -9,70 +9,42 @@ class StudentEvaluationForm extends StatefulWidget {
 
 class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
   int _currentIndex = 0;
-  int _totalScore = 0;
   bool _isSavingToDatabase = false; // State to show saving process
 
-  final List<Map<String, dynamic>> _questions = [
-    {
-      'theme': 'Part 1: Class Comfort & Environment',
-      'question': '1. How comfortable do you feel asking questions or sharing your thoughts in this class?',
-      'options': [
-        {'text': 'Very comfortable. I always share my thoughts.', 'score': 5},
-        {'text': 'Mostly comfortable, but sometimes I hold back.', 'score': 4},
-        {'text': 'I only speak if the teacher calls on me.', 'score': 3},
-        {'text': 'I rarely speak, I feel a bit nervous.', 'score': 2},
-        {'text': 'I never speak. I do not feel comfortable at all.', 'score': 1},
-      ]
-    },
-    {
-      'theme': 'Part 2: Understanding of Materials',
-      'question': '2. How well do you feel you grasped the core concepts taught this year?',
-      'options': [
-        {'text': 'Mastered them easily. I could teach others.', 'score': 5},
-        {'text': 'Understood most of it, just a few confusing parts.', 'score': 4},
-        {'text': 'I needed extra help to understand the basics.', 'score': 3},
-        {'text': 'I struggled often and fell behind.', 'score': 2},
-        {'text': 'Completely lost. The material was too hard.', 'score': 1},
-      ]
-    },
-    {
-      'theme': 'Part 3: Engagement & Participation',
-      'question': '3. How active were you during class discussions and group activities?',
-      'options': [
-        {'text': 'Always highly focused and active in groups.', 'score': 5},
-        {'text': 'Usually focused, but sometimes got distracted.', 'score': 4},
-        {'text': 'I just listened and let others do the group work.', 'score': 3},
-        {'text': 'I was easily distracted by my phone or friends.', 'score': 2},
-        {'text': 'I was completely disengaged and did not participate.', 'score': 1},
-      ]
-    },
-    {
-      'theme': 'Part 4: Learning Pace',
-      'question': '4. Did you feel the pace of this class matched your learning speed?',
-      'options': [
-        {'text': 'Perfect pace. I learned smoothly.', 'score': 5},
-        {'text': 'Slightly fast/slow, but totally manageable.', 'score': 4},
-        {'text': 'Often too fast or too slow for me.', 'score': 3},
-        {'text': 'Very hard to keep up. I felt stressed.', 'score': 2},
-        {'text': 'Overwhelming. I couldn\'t follow at all.', 'score': 1},
-      ]
-    },
-    {
-      'theme': 'Part 5: Overall Growth',
-      'question': '5. Overall, how would you rate your personal growth in this class this year?',
-      'options': [
-        {'text': 'Exceptional growth. I improved significantly.', 'score': 5},
-        {'text': 'Solid improvement. I learned a lot.', 'score': 4},
-        {'text': 'Stayed about the same. No big changes.', 'score': 3},
-        {'text': 'Declined slightly. I lost motivation.', 'score': 2},
-        {'text': 'Very disappointed. I did not grow at all.', 'score': 1},
-      ]
-    }
+  final TextEditingController _answerController =
+    TextEditingController();
+
+List<String> _answers = [];
+
+  final List<String> _questions = [
+    "1. How was your experience in this class with your classmates for the past year?",
+
+    "2. How was your experience in this class with your teachers for the past year?",
+
+    "3. What has been the highlight throughout the year?",
+
+    "4. Would you like to stay in this class? Why or why not?",
+
+    "5. What do you wish the class could do differently?",
   ];
 
-  void _answerQuestion(int score) {
+  void _submitAnswer() {
+
+    if (_answerController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please write your answer."),
+        ),
+      );
+      return;
+    }
+
+    _answers.add(_answerController.text);
+
+    _answerController.clear();
+
     setState(() {
-      _totalScore += score;
+
       if (_currentIndex < _questions.length - 1) {
         _currentIndex++;
       } else {
@@ -194,37 +166,76 @@ class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
   }
 
   Widget _buildQuestionPage() {
-    final currentQ = _questions[_currentIndex];
+
+    String currentQuestion = _questions[_currentIndex];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+
         Text(
-          currentQ['theme'],
-          style: const TextStyle(fontSize: 14, color: Colors.blueGrey, fontWeight: FontWeight.bold),
+          "Question ${_currentIndex + 1}",
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.blueGrey,
+            fontWeight: FontWeight.bold,
+          ),
         ),
+
         const SizedBox(height: 12),
+
         Text(
-          currentQ['question'],
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+          currentQuestion,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
         ),
-        const SizedBox(height: 40),
-        ...((currentQ['options'] as List).map((opt) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: ElevatedButton(
-              onPressed: () => _answerQuestion(opt['score']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.black87,
-                elevation: 2,
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: Text(opt['text'], style: const TextStyle(fontSize: 16, height: 1.4)),
+
+        const SizedBox(height: 30),
+
+        TextField(
+          controller: _answerController,
+          maxLines: 6,
+
+          decoration: InputDecoration(
+            hintText: "Write your response here...",
+            filled: true,
+            fillColor: Colors.white,
+
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
             ),
-          );
-        })),
+          ),
+        ),
+
+        const SizedBox(height: 30),
+
+        ElevatedButton(
+          onPressed: _submitAnswer,
+
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 18),
+
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+
+          child: Text(
+            _currentIndex == _questions.length - 1
+                ? "Submit Evaluation"
+                : "Next Question",
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       ],
     );
   }
