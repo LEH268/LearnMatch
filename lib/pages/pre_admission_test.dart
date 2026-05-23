@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // IMPORT: Firestore database
 import 'pre_admission_report.dart';
 
 class PreAdmissionTestPage extends StatefulWidget {
@@ -20,7 +21,7 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
   int _impulsivityScore = 0;
   int _reflectivityScore = 0;
 
-  // ✅ NEW: student info
+  // Student Info Variables
   String _studentName = "";
   String _emergencyContact = "";
   bool _started = false;
@@ -250,23 +251,52 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
     });
   }
 
-  void _submitTest() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ReportPage(
-          varkScores: _varkScores,
-          pScores: {
-            'S': _structuredScore,
-            'E': _exploratoryScore,
-            'I': _introvertScore,
-            'X': _extrovertScore,
-            'P': _impulsivityScore,
-            'R': _reflectivityScore,
-          },
-        ),
-      ),
-    );
+  // ASYNC FUNCTION: Save data to Firebase when the test is completed
+  void _submitTest() async {
+    try {
+      // 1. Create a 'students' collection in Firestore and add this user's data
+      await FirebaseFirestore.instance.collection('students').add({
+        'name': _studentName,
+        'emergencyContact': _emergencyContact,
+        'varkScores': _varkScores,
+        'personalityScores': {
+          'Structured': _structuredScore,
+          'Exploratory': _exploratoryScore,
+          'Introvert': _introvertScore,
+          'Extrovert': _extrovertScore,
+          'Impulsivity': _impulsivityScore,
+          'Reflectivity': _reflectivityScore,
+        },
+        'testCompletedAt': FieldValue.serverTimestamp(), // Automatically record submission time
+      });
+
+      // 2. Navigate to the report page ONLY after successful save
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReportPage(
+              varkScores: _varkScores,
+              pScores: {
+                'S': _structuredScore,
+                'E': _exploratoryScore,
+                'I': _introvertScore,
+                'X': _extrovertScore,
+                'P': _impulsivityScore,
+                'R': _reflectivityScore,
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show an error popup if saving to Firebase fails
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to save results: $e")),
+        );
+      }
+    }
   }
 
   @override
@@ -294,7 +324,7 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
     );
   }
 
-  // ✅ START PAGE (NEW)
+  // START SCREEN UI
   Widget _buildStartUI() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,8 +343,7 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
         const SizedBox(height: 20),
 
         TextField(
-          decoration:
-              const InputDecoration(labelText: "Emergency Contact"),
+          decoration: const InputDecoration(labelText: "Emergency Contact"),
           onChanged: (v) => _emergencyContact = v,
         ),
 
@@ -328,13 +357,17 @@ class _PreAdmissionTestPageState extends State<PreAdmissionTestPage> {
               _started = true;
             });
           },
+          style: ElevatedButton.styleFrom(
+             backgroundColor: const Color(0xFF0F9D58),
+             foregroundColor: Colors.white,
+          ),
           child: const Text("Start Test"),
         ),
       ],
     );
   }
 
-  // ✅ QUESTION UI (YOUR ORIGINAL UI MOVED HERE)
+  // QUESTION SCREEN UI
   Widget _buildQuestionUI(double progress) {
     final currentQ = _questions[_currentIndex];
 
