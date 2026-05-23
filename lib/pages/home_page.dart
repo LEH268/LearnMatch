@@ -21,111 +21,155 @@ class HomePage extends StatelessWidget {
           "Teacher Dashboard 🌟",
           style: TextStyle(
             color: Color(0xFF0F9D58),
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            fontSize: 22,
+            letterSpacing: 0.5,
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle_rounded, color: Color(0xFF0F9D58), size: 30),
-            onPressed: () {
-              // TODO: Navigate to teacher profile settings
-            },
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F9D58).withOpacity(0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.account_circle_rounded, color: Color(0xFF0F9D58), size: 28),
+              onPressed: () {
+              },
+            ),
           ),
-          const SizedBox(width: 16),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Welcome Greeting for the Teacher
-              const Text(
-                "Welcome Back, Educator! 👋",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black87,
+              // Welcome Banner
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0F9D58), Color(0xFF0B8043)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F9D58).withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Let's orchestrate your adaptive classroom today.",
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.blueGrey,
-                  fontWeight: FontWeight.w500,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Welcome Back, Educator! 👋",
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Let's orchestrate your adaptive classroom today.",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.9),
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 32),
 
-              // Core Features Section Title
-              const Text(
-                "Classroom Tools 🛠️",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black54,
-                ),
+              Row(
+                children: [
+                  const Text(
+                    "Classroom Tools",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.build_circle_rounded, color: Colors.grey.shade400, size: 20),
+                ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // Feature 1: Assessment Link Generator (Form for students)
+              // Feature 1: Assessment Link Generator
               _buildFeatureCard(
                 context,
-                title: "Create Assessment Link 🔗",
-                description: "Draft questions and generate a shareable web link. Students fill it out with zero login required!",
+                title: "Pre-admission Test 📝",
+                description: "Discover how students learn best. Send a quick, login-free web link to instantly build their personality and VARK learning profiles.",
                 iconData: Icons.assignment_rounded, 
-                color: const Color(0xFFE8F5E9), // Light green
+                color: const Color(0xFFE8F5E9), 
                 accentColor: const Color(0xFF0F9D58),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AssessmentLinkPage()),
                 ),
               ),
-              const SizedBox(height: 20),
 
-              // Feature 2: Learning Intelligence Network (Analytics)
+              // Feature 2: Learning Intelligence Network
               _buildFeatureCard(
                 context,
-                title: "Student Intelligence 🕸️",
-                description: "Monitor incoming form responses, visualize class relationships, and catch early risk signals instantly.",
+                title: "Relationship Diagram 🕸️",
+                description: "Uncover the hidden social web of your classroom. Visualize student connections to proactively build an inclusive and safe learning space.",
                 iconData: Icons.hub_rounded,
-                color: const Color(0xFFE3F2FD), // Light blue
-                accentColor: Colors.blue,
+                color: const Color(0xFFE3F2FD), 
+                accentColor: Colors.blue.shade700,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ClassNetworkPage()),
                 ),
               ),
-              const SizedBox(height: 20),
 
-              // Feature 3: AI Re-Streaming System (Class placement logic connected to Follow-up Page)
+              // Feature 3: AI Re-Streaming System
               _buildFeatureCard(
                 context,
-                title: "AI Class Placement 🚀",
-                description: "Run end-of-cycle evaluations for your entire class. Get AI-driven recommendations for re-streaming.",
+                title: "Class Fit Analyzer 📊",
+                description: "Take the guesswork out of annual re-streaming. Use AI to analyze performance and feedback for the perfect academic placement.",
                 iconData: Icons.groups_rounded,
-                color: const Color(0xFFFFF3E0), // Light orange
-                accentColor: Colors.orange,
+                color: const Color(0xFFFFF3E0), 
+                accentColor: Colors.orange.shade700,
                 onTap: () => Navigator.push(
                   context,
-                  // Here we link to the newly created StudentFollowUpPage
                   MaterialPageRoute(builder: (context) => const StudentFollowUpPage()),
                 ),
               ),
-              const SizedBox(height: 20),
 
               // Feature 4: Special Request Form
               _buildFeatureCard(
                 context,
-                title: "Special Request 🧩",
-                description: "Submit student special needs or conditions to help create a supportive learning environment.",
+                title: "Special Request 🫂",
+                description: "Ensure no student is left behind. Securely record special accommodations and neurodivergent needs to deliver truly personalized support.",
                 iconData: Icons.health_and_safety_rounded,
-                color: const Color(0xFFEDE7F6), // light purple
-                accentColor: const Color(0xFF6A1B9A),
+                color: const Color(0xFFF3E5F5), 
+                accentColor: const Color(0xFF7B1FA2),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -133,7 +177,8 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -146,21 +191,21 @@ class HomePage extends StatelessWidget {
     required String title,
     required String description,
     required IconData iconData,
-    required Color color,
+    required Color color, 
     required Color accentColor,
     required VoidCallback onTap,
   }) {
     return Container(
-      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: color,
+        color: Colors.white, 
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withOpacity(0.8), width: 1.5), 
         boxShadow: [
           BoxShadow(
-            color: accentColor.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: accentColor.withOpacity(0.08), 
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -169,16 +214,18 @@ class HomePage extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(24),
+          highlightColor: color.withOpacity(0.3),
+          splashColor: color.withOpacity(0.5),
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    color: color, 
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
                     iconData,
@@ -186,7 +233,7 @@ class HomePage extends StatelessWidget {
                     color: accentColor,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 20),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,9 +241,10 @@ class HomePage extends StatelessWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: accentColor, 
+                          color: Colors.grey.shade900, 
+                          letterSpacing: 0.2,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -204,17 +252,21 @@ class HomePage extends StatelessWidget {
                         description,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade700,
-                          height: 1.4,
+                          color: Colors.grey.shade600,
+                          height: 1.5,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: accentColor.withOpacity(0.5),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Colors.grey.shade400,
+                  ),
                 ),
               ],
             ),
@@ -225,7 +277,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// Placeholder for other features (Keep this in case you need it for future modules)
 class FeaturePage extends StatelessWidget {
   final String title;
   const FeaturePage({super.key, required this.title});
@@ -235,26 +286,57 @@ class FeaturePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF2FBFA),
       appBar: AppBar(
-        title: Text(title),
+        title: Text(title, style: const TextStyle(color: Color(0xFF0F9D58), fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF0F9D58)),
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.construction_rounded, size: 80, color: Color(0xFF0F9D58)),
-            const SizedBox(height: 16),
-            Text(
-              "$title\nWorkspace coming soon! ✨",
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 20, 
-                fontWeight: FontWeight.bold, 
-                color: Colors.blueGrey,
+        child: Container(
+          margin: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(40),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F9D58).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.construction_rounded, size: 64, color: Color(0xFF0F9D58)),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                "$title\nWorkspace coming soon! ✨",
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20, 
+                  fontWeight: FontWeight.bold, 
+                  color: Color(0xFF1A1A1A),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "We are currently building this module for the next big update.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.blueGrey),
+              )
+            ],
+          ),
         ),
       ),
     );
