@@ -4,8 +4,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:learn_match/home_page.dart';
 import 'package:learn_match/login_page.dart';
 
-import 'pages/class_network_page.dart';
 import 'pages/pre_admission_test.dart';
+import 'pages/class_network_page.dart';
+import 'pages/student_evaluation_form.dart';
 import 'pages/special_request_form_page.dart';
 
 void main() async {
@@ -46,6 +47,7 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomePage(),
         '/network': (context) => const ClassNetworkPage(),
         '/pre-admission-test': (context) => const PreAdmissionTestPage(),
+        '/student-evaluation': (context) => const StudentEvaluationForm(),
         '/special-request': (context) => const SpecialRequestFormPage(),
       },
     );
