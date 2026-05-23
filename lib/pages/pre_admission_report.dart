@@ -1,27 +1,26 @@
 import 'package:flutter/material.dart';
 
-// ==========================================
-// 学生分析报告页 (Report Page)
-// ==========================================
+// =============
+// Report Page
+// =============
 class ReportPage extends StatelessWidget {
   final Map<String, int> varkScores;
   final Map<String, int> pScores;
 
   const ReportPage({super.key, required this.varkScores, required this.pScores});
 
-  // 计算百分比的辅助函数
   int _calcPercent(int score, int total) => total == 0 ? 0 : ((score / total) * 100).round();
 
   @override
   Widget build(BuildContext context) {
-    // 1. 计算 VARK 总分与百分比
+    // 1. count VARK total marks and calculate percentages
     int totalVark = varkScores.values.reduce((a, b) => a + b);
     int pV = _calcPercent(varkScores['V']!, totalVark);
     int pA = _calcPercent(varkScores['A']!, totalVark);
     int pR = _calcPercent(varkScores['R']!, totalVark);
     int pK = _calcPercent(varkScores['K']!, totalVark);
 
-    // 2. 计算性格特征动态百分比
+    // 2. count personality trait totals and calculate dynamic percentages
     int totalSE = pScores['S']! + pScores['E']!;
     int pS = _calcPercent(pScores['S']!, totalSE);
     int pE = _calcPercent(pScores['E']!, totalSE);
@@ -34,7 +33,7 @@ class ReportPage extends StatelessWidget {
     int pP = _calcPercent(pScores['P']!, totalPR);
     int pRef = _calcPercent(pScores['R']!, totalPR);
 
-    // 3. 生成简单的 AI Insight 话术 (MVP 演示用)
+    // 3. generate simple AI insight text
     String topVark = varkScores.entries.reduce((a, b) => a.value > b.value ? a : b).key;
     String varkInsight = topVark == 'V' ? "You learn best through visual aids like charts and videos." :
                          topVark == 'A' ? "You thrive in discussions and listening environments." :
