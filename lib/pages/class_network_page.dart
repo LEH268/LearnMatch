@@ -351,6 +351,57 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
     );
   }
 
+// =====================================================
+  // DELETE TEACHER DIALOG
+  // =====================================================
+  void _confirmDeleteTeacher(Teacher teacher) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade400),
+            const SizedBox(width: 8),
+            const Text('删除老师 (Delete Teacher)'),
+          ],
+        ),
+        content: Text('Are you sure you want to remove ${teacher.name}? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.blueGrey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // 从 Firestore 删除老师数据
+              await FirebaseFirestore.instance
+                  .collection('teachers')
+                  .doc(teacher.id)
+                  .delete();
+              
+              if (ctx.mounted) Navigator.pop(ctx);
+
+              // 如果删除的老师刚好是当前 Focus 的老师，则重置视图
+              if (_focusedTeacherId == teacher.id) {
+                setState(() {
+                  _focusedTeacherId = null;
+                  _filterVisibleElements();
+                });
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _dialogTextField(
       TextEditingController ctrl, String hint, IconData icon) {
     return TextField(
@@ -646,6 +697,8 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                 style: TextStyle(fontSize: 10, color: Colors.blueGrey)),
             const Text('Tap teacher to focus',
                 style: TextStyle(fontSize: 10, color: Colors.blueGrey)),
+            const Text('Long press teacher to delete',
+                style: TextStyle(fontSize: 10, color: Colors.redAccent)),
           ],
         ),
       ),
@@ -983,11 +1036,15 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
                     child: GestureDetector(
-                      // A short press still opens / focuses / expands.
+                      // 短按功能：打开、聚焦或展开
                       onTap: () => _handleNodeTap(node),
-                      // A drag moves the node. Updating node.position in
-                      // place is enough — EdgePainter reads it directly,
-                      // so edges follow in real time.
+                      
+                      // 新增长按功能：长按老师节点触发删除
+                      onLongPress: () {
+                        if (node.type == NodeType.teacherNode) {
+                          _confirmDeleteTeacher(node.data as Teacher);
+                        }
+                      },
                       onPanUpdate: (details) {
                         setState(() {
                           node.position = Offset(
