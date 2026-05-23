@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:learn_match/home_page.dart';
-import 'package:learn_match/login_page.dart';
+import 'package:learn_match/pages/home_page.dart';
+import 'package:learn_match/pages/login_page.dart';
 
-import 'login_page.dart';
-import 'home_page.dart';
+import 'pages/login_page.dart';
+import 'pages/home_page.dart';
 import 'pages/class_network_page.dart';
 
 void main() async {

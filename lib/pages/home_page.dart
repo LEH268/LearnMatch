@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'pages/pre_admission_test.dart';
-import 'pages/class_network_page.dart'; 
-import 'pages/assessment_link_page.dart';
-import 'pages/student_follow_up_page.dart';
+import 'pre_admission_test.dart';
+import 'class_network_page.dart'; 
+import 'assessment_link_page.dart';
+import 'student_follow_up_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
