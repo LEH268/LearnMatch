@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 
-class ReportPage extends StatelessWidget {
+class ReportPage extends StatefulWidget {
+  
   final String studentName;
   final Map<String, int> varkScores;
   final Map<String, int> pScores;
@@ -12,46 +14,58 @@ class ReportPage extends StatelessWidget {
     required this.pScores,
   });
 
+  @override
+  State<ReportPage> createState() => _ReportPageState();
+}
+
+class _ReportPageState extends State<ReportPage> {
+  
+  String aiVarkInsight = "Generating AI insight...";
+  String aiPersonalityInsight = "Generating AI insight...";
+  bool isLoadingAI = true;
+
+  final model = GenerativeModel(
+    model: 'gemini-2.5-flash',
+    apiKey: '',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    generateAIInsights();
+  }
 
   int _calcPercent(int score, int total) =>
       total == 0 ? 0 : ((score / total) * 100).round();
 
   @override
   Widget build(BuildContext context) {
-    int totalVark = varkScores.values.reduce((a, b) => a + b);
+    int totalVark = widget.varkScores.values.reduce((a, b) => a + b);
 
-    int pV = _calcPercent(varkScores['V']!, totalVark);
-    int pA = _calcPercent(varkScores['A']!, totalVark);
-    int pR = _calcPercent(varkScores['R']!, totalVark);
-    int pK = _calcPercent(varkScores['K']!, totalVark);
+    int pV = _calcPercent(widget.varkScores['V']!, totalVark);
+    int pA = _calcPercent(widget.varkScores['A']!, totalVark);
+    int pR = _calcPercent(widget.varkScores['R']!, totalVark);
+    int pK = _calcPercent(widget.varkScores['K']!, totalVark);
 
-    final int totalSE = (pScores['S'] ?? 0) + (pScores['E'] ?? 0);
-    final int pS   = _calcPercent(pScores['S'] ?? 0, totalSE);
-    final int pE   = _calcPercent(pScores['E'] ?? 0, totalSE);
+    final int totalSE = (widget.pScores['S'] ?? 0) + (widget.pScores['E'] ?? 0);
+    final int pS   = _calcPercent(widget.pScores['S'] ?? 0, totalSE);
+    final int pE   = _calcPercent(widget.pScores['E'] ?? 0, totalSE);
 
-    final int totalIX = (pScores['I'] ?? 0) + (pScores['X'] ?? 0);
-    final int pI   = _calcPercent(pScores['I'] ?? 0, totalIX);
-    final int pX   = _calcPercent(pScores['X'] ?? 0, totalIX);
+    final int totalIX = (widget.pScores['I'] ?? 0) + (widget.pScores['X'] ?? 0);
+    final int pI   = _calcPercent(widget.pScores['I'] ?? 0, totalIX);
+    final int pX   = _calcPercent(widget.pScores['X'] ?? 0, totalIX);
 
-    int totalPR = pScores['P']! + pScores['R']!;
-    int pP = _calcPercent(pScores['P']!, totalPR);
-    int pRef = _calcPercent(pScores['R']!, totalPR);
+    int totalPR = widget.pScores['P']! + widget.pScores['R']!;
+    int pP = _calcPercent(widget.pScores['P']!, totalPR);
+    int pRef = _calcPercent(widget.pScores['R']!, totalPR);
 
     // Dominant VARK
     String topVark = 'V';
     if (totalVark > 0) {
-      topVark = varkScores.entries
+      topVark = widget.varkScores.entries
           .reduce((a, b) => a.value > b.value ? a : b)
           .key;
     }
-
-    final String varkInsight = topVark == 'V'
-        ? "You learn best through visual aids like charts and videos."
-        : topVark == 'A'
-            ? "You thrive in discussions and listening environments."
-            : topVark == 'R'
-                ? "Reading and writing structured notes is your superpower."
-                : "You are a hands-on learner. Physical engagement is key.";
 
     final Map<String, Color> varkColors = {
       'V': const Color(0xFF1565C0),
@@ -64,7 +78,7 @@ class ReportPage extends StatelessWidget {
       backgroundColor: const Color(0xFFF2FBFA),
       appBar: AppBar(
         title: Text(
-          studentName.isEmpty ? "Learning Profile" : "$studentName's Report",
+          widget.studentName.isEmpty ? "Learning Profile" : "${widget.studentName}'s Report",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
@@ -84,7 +98,7 @@ class ReportPage extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              studentName.isEmpty ? "" : "Student: $studentName",
+              widget.studentName.isEmpty ? "" : "Student: ${widget.studentName}",
               style: const TextStyle(color: Colors.blueGrey, fontSize: 14),
             ),
             const SizedBox(height: 28),
@@ -114,7 +128,8 @@ class ReportPage extends StatelessWidget {
                       color: varkColors[topVark] ?? Colors.grey),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(varkInsight,
+                    // 修正了未定义的变量名
+                    child: Text(isLoadingAI ? "Generating AI insight..." : aiVarkInsight,
                         style: const TextStyle(
                             fontSize: 14, height: 1.5)),
                   ),
@@ -136,6 +151,39 @@ class ReportPage extends StatelessWidget {
             _buildDualBar("Introvert",   pI,  "Extrovert",   pX,  Colors.teal),
             const SizedBox(height: 12),
             _buildDualBar("Impulsivity", pP,  "Reflectivity",pRef,Colors.deepOrange),
+
+            const SizedBox(height: 16),
+
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.teal.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.psychology,
+                    color: Colors.teal,
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: Text(
+                      isLoadingAI
+                          ? "Generating AI personality insight..."
+                          : aiPersonalityInsight,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
             const SizedBox(height: 40),
 
@@ -160,6 +208,109 @@ class ReportPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> generateAIInsights() async {
+    int totalVark =
+        widget.varkScores.values.reduce((a, b) => a + b);
+
+    int pV = _calcPercent(widget.varkScores['V']!, totalVark);
+    int pA = _calcPercent(widget.varkScores['A']!, totalVark);
+    int pR = _calcPercent(widget.varkScores['R']!, totalVark);
+    int pK = _calcPercent(widget.varkScores['K']!, totalVark);
+
+    final int totalSE =
+        (widget.pScores['S'] ?? 0) +
+        (widget.pScores['E'] ?? 0);
+
+    final int pS =
+        _calcPercent(widget.pScores['S'] ?? 0, totalSE);
+
+    final int pE =
+        _calcPercent(widget.pScores['E'] ?? 0, totalSE);
+
+    final int totalIX =
+        (widget.pScores['I'] ?? 0) +
+        (widget.pScores['X'] ?? 0);
+
+    final int pI =
+        _calcPercent(widget.pScores['I'] ?? 0, totalIX);
+
+    final int pX =
+        _calcPercent(widget.pScores['X'] ?? 0, totalIX);
+
+    int totalPR =
+        widget.pScores['P']! +
+        widget.pScores['R']!;
+
+    int pP =
+        _calcPercent(widget.pScores['P']!, totalPR);
+
+    int pRef =
+        _calcPercent(widget.pScores['R']!, totalPR);
+
+    try {
+      // 💡 获取学生名字，如果没填名字就用 "This student"
+      String studentLabel = widget.studentName.isEmpty ? "This student" : widget.studentName;
+
+      // 重新调教 VARK AI prompt
+      final varkPrompt = """
+  Student VARK scores:
+  Visual: $pV%
+  Auditory: $pA%
+  Read/Write: $pR%
+  Kinesthetic: $pK%
+
+  Write a short learning insight in 2 sentences based on these VARK scores. 
+  IMPORTANT: This report is being read by a teacher. You MUST refer to the student as '$studentLabel' or use third-person pronouns. Do NOT use the word 'you'.
+  """;
+
+      final varkResponse = await model.generateContent([
+        Content.text(varkPrompt)
+      ]);
+
+      // 重新调教 Personality AI prompt
+      final personalityPrompt = """
+  Student personality profile:
+  Structured: $pS%
+  Exploratory: $pE%
+  Introvert: $pI%
+  Extrovert: $pX%
+  Impulsive: $pP%
+  Reflective: $pRef%
+
+  Write a short personality and learning behavior insight in 2 sentences based on these scores.
+  IMPORTANT: This report is being read by a teacher. You MUST refer to the student as '$studentLabel' or use third-person pronouns. Do NOT use the word 'you'.
+  """;
+
+      final personalityResponse = await model.generateContent([
+        Content.text(personalityPrompt)
+      ]);
+
+      setState(() {
+        aiVarkInsight =
+            varkResponse.text ??
+            "No AI insight generated.";
+
+        aiPersonalityInsight =
+            personalityResponse.text ??
+            "No AI insight generated.";
+
+        isLoadingAI = false;
+      });
+
+    } catch (e) {
+
+      setState(() {
+        aiVarkInsight =
+            "Failed to generate AI insight.";
+
+        aiPersonalityInsight =
+            "Failed to generate AI insight.";
+
+        isLoadingAI = false;
+      });
+    }
   }
 
   // ── VARK single bar ──────────────────────────────
