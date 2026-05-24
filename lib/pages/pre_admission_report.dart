@@ -7,11 +7,20 @@ class ReportPage extends StatefulWidget {
   final Map<String, int> varkScores;
   final Map<String, int> pScores;
 
+  // ── Special needs (optional — set from assessment_link_page when
+  //    the student has a flagged special_request submission) ──
+  final bool hasSpecialNeeds;
+  final List<String> specialConditions;
+  final String specialConditionsOthers;
+
   const ReportPage({
     super.key,
     required this.studentName,
     required this.varkScores,
     required this.pScores,
+    this.hasSpecialNeeds = false,
+    this.specialConditions = const [],
+    this.specialConditionsOthers = '',
   });
 
   @override
@@ -101,6 +110,13 @@ class _ReportPageState extends State<ReportPage> {
               widget.studentName.isEmpty ? "" : "Student: ${widget.studentName}",
               style: const TextStyle(color: Colors.blueGrey, fontSize: 14),
             ),
+
+            // ── Special Needs Banner (only shown if flagged) ──
+            if (widget.hasSpecialNeeds) ...[
+              const SizedBox(height: 16),
+              _buildSpecialNeedsBanner(),
+            ],
+
             const SizedBox(height: 28),
 
             // ── VARK Section ───────────────────────
@@ -307,6 +323,65 @@ class _ReportPageState extends State<ReportPage> {
         isLoadingAI = false;
       });
     }
+  }
+
+  // ── Special needs banner (red, prominent) ──────
+  Widget _buildSpecialNeedsBanner() {
+    final List<String> allItems = [
+      ...widget.specialConditions,
+      if (widget.specialConditionsOthers.isNotEmpty)
+        widget.specialConditionsOthers,
+    ];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD32F2F), width: 1.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Color(0xFFD32F2F),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.flag_rounded,
+                color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Special Needs Flagged',
+                  style: TextStyle(
+                    color: Color(0xFFD32F2F),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  allItems.isEmpty
+                      ? 'Parent has submitted a special request for this student.'
+                      : 'Conditions: ${allItems.join(", ")}',
+                  style: const TextStyle(
+                    color: Color(0xFFB71C1C),
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── VARK single bar ──────────────────────────────

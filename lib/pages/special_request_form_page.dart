@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/firestore_service.dart'; 
+import '../services/firestore_service.dart';
 
 class SpecialRequestFormPage extends StatefulWidget {
   const SpecialRequestFormPage({super.key});
@@ -10,11 +10,11 @@ class SpecialRequestFormPage extends StatefulWidget {
 
 class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _contactController = TextEditingController();
+  final TextEditingController _classController = TextEditingController();
   final TextEditingController _othersController = TextEditingController();
 
   final FirestoreService _firestoreService = FirestoreService();
-  bool _isLoading = false; 
+  bool _isLoading = false;
 
   final Map<String, bool> _conditions = {
     "ADHD": false,
@@ -31,23 +31,24 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
       );
       return;
     }
+    if (_classController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter the student's class")),
+      );
+      return;
+    }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      List<String> selectedConditions = [];
+      final List<String> selectedConditions = [];
       _conditions.forEach((key, isSelected) {
-        if (isSelected) {
-          selectedConditions.add(key);
-        }
+        if (isSelected) selectedConditions.add(key);
       });
 
-      // sent to firebase
       await _firestoreService.submitSpecialRequest(
         studentName: _nameController.text.trim(),
-        emergencyContact: _contactController.text.trim(),
+        className: _classController.text.trim(),
         conditions: selectedConditions,
         others: _othersController.text.trim(),
       );
@@ -57,16 +58,27 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
           context: context,
           barrierDismissible: false,
           builder: (_) => AlertDialog(
-            title: const Text("Submitted Successfully"),
-            content: Text("Special request for ${_nameController.text} has been synced and recorded."),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 10),
+                Text("Submitted Successfully"),
+              ],
+            ),
+            content: Text(
+              "Special request for ${_nameController.text} has been synced. "
+              "The student profile is now flagged for special needs in all reports.",
+            ),
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context); 
-                  Navigator.pop(context); 
+                  Navigator.pop(context);
+                  Navigator.pop(context);
                 },
                 child: const Text("OK"),
-              )
+              ),
             ],
           ),
         );
@@ -78,18 +90,14 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _contactController.dispose();
+    _classController.dispose();
     _othersController.dispose();
     super.dispose();
   }
@@ -115,25 +123,38 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
             ),
             const SizedBox(height: 10),
             const Text(
-              "Does your child have any special requests or conditions?\n(This information is confidential.)",
+              "Does your child have any special requests or conditions?\n"
+              "(This information is confidential.)\n\n"
+              "Please use the same name and class as the pre-admission test "
+              "so the request links to your child's profile.",
+              style: TextStyle(color: Colors.blueGrey, height: 1.4),
             ),
             const SizedBox(height: 20),
 
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: "Student Name"),
+              decoration: const InputDecoration(
+                labelText: "Student Name",
+                prefixIcon: Icon(Icons.person_outline),
+              ),
             ),
+            const SizedBox(height: 10),
             TextField(
-              controller: _contactController,
-              decoration: const InputDecoration(labelText: "Emergency Contact"),
+              controller: _classController,
+              decoration: const InputDecoration(
+                labelText: "Class Name (e.g. Year 1 - Class A)",
+                prefixIcon: Icon(Icons.class_outlined),
+              ),
             ),
             const SizedBox(height: 20),
 
-            const Text("Conditions:", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text("Conditions:",
+                style: TextStyle(fontWeight: FontWeight.bold)),
             ..._conditions.keys.map((key) {
               return CheckboxListTile(
                 title: Text(key),
                 value: _conditions[key],
+                activeColor: const Color(0xFF6A1B9A),
                 onChanged: (val) {
                   setState(() {
                     _conditions[key] = val ?? false;
@@ -141,9 +162,7 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
                     if (key == "None" && val == true) {
                       _conditions.updateAll((k, v) => false);
                       _conditions["None"] = true;
-                    } 
-              
-                    else if (key != "None" && val == true) {
+                    } else if (key != "None" && val == true) {
                       _conditions["None"] = false;
                     }
                   });
@@ -153,7 +172,11 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
 
             TextField(
               controller: _othersController,
-              decoration: const InputDecoration(labelText: "Others (optional)"),
+              decoration: const InputDecoration(
+                labelText: "Others (optional)",
+                prefixIcon: Icon(Icons.note_alt_outlined),
+              ),
+              maxLines: 2,
             ),
             const SizedBox(height: 30),
 
@@ -162,14 +185,20 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6A1B9A),
                 minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: _isLoading 
+              child: _isLoading
                   ? const SizedBox(
-                      width: 24, 
-                      height: 24, 
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2),
                     )
-                  : const Text("Submit", style: TextStyle(color: Colors.white)),
+                  : const Text("Submit",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold)),
             ),
           ],
         ),

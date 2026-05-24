@@ -312,6 +312,19 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
                           final pRaw = Map<String, int>.from(
                               data['personalityScores'] ?? {});
 
+                          // Special-needs flag — set by special_request form
+                          final hasSpecialNeeds =
+                              data['hasSpecialNeeds'] == true;
+                          final List<String> conditions =
+                              (data['specialConditions'] as List?)
+                                      ?.map((e) => e.toString())
+                                      .where((s) => s != 'None')
+                                      .toList() ??
+                                  const [];
+                          final String otherCondition =
+                              (data['specialConditionsOthers'] ?? '')
+                                  .toString();
+
                           String dominant = '-';
                           if (varkRaw.isNotEmpty) {
                             dominant = varkRaw.entries
@@ -321,17 +334,27 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
 
                           final isUnassigned = className == 'Unassigned';
 
+                          // Outline priority: special-needs > unassigned > none
+                          final Border? cardBorder = hasSpecialNeeds
+                              ? Border.all(
+                                  color: const Color(0xFFD32F2F), width: 1.5)
+                              : isUnassigned
+                                  ? Border.all(
+                                      color: Colors.orange.shade200)
+                                  : null;
+
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(18),
-                              border: isUnassigned
-                                  ? Border.all(color: Colors.orange.shade200)
-                                  : null,
+                              border: cardBorder,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: hasSpecialNeeds
+                                      ? const Color(0xFFD32F2F)
+                                          .withOpacity(0.10)
+                                      : Colors.black.withOpacity(0.05),
                                   blurRadius: 8,
                                   offset: const Offset(0, 3),
                                 ),
@@ -341,30 +364,91 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20, vertical: 10),
                               leading: CircleAvatar(
-                                backgroundColor: isUnassigned
-                                    ? Colors.orange.shade50
-                                    : Colors.blue.shade50,
+                                backgroundColor: hasSpecialNeeds
+                                    ? const Color(0xFFD32F2F).withOpacity(0.12)
+                                    : isUnassigned
+                                        ? Colors.orange.shade50
+                                        : Colors.blue.shade50,
                                 child: Text(
                                   name.isNotEmpty
                                       ? name[0].toUpperCase()
                                       : '?',
                                   style: TextStyle(
-                                      color: isUnassigned
-                                          ? Colors.orange
-                                          : Colors.blue,
-                                      fontWeight: FontWeight.bold),
+                                    color: hasSpecialNeeds
+                                        ? const Color(0xFFD32F2F)
+                                        : isUnassigned
+                                            ? Colors.orange
+                                            : Colors.blue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                              title: Text(name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold)),
-                              subtitle: Text(
-                                'Style: $dominant  •  Class: $className',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: isUnassigned
-                                        ? Colors.orange.shade800
-                                        : Colors.blueGrey),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                  ),
+                                  if (hasSpecialNeeds)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFD32F2F),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.flag_rounded,
+                                              size: 12,
+                                              color: Colors.white),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Special Needs',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Style: $dominant  •  Class: $className',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isUnassigned
+                                          ? Colors.orange.shade800
+                                          : Colors.blueGrey,
+                                    ),
+                                  ),
+                                  if (hasSpecialNeeds &&
+                                      (conditions.isNotEmpty ||
+                                          otherCondition.isNotEmpty))
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        '⚠ ${[...conditions, if (otherCondition.isNotEmpty) otherCondition].join(", ")}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFFD32F2F),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                               trailing: const Icon(
                                   Icons.arrow_forward_ios_rounded,
@@ -387,6 +471,10 @@ class _AssessmentLinkPageState extends State<AssessmentLinkPage> {
                                       studentName: name,
                                       varkScores: varkRaw,
                                       pScores: pScores,
+                                      hasSpecialNeeds: hasSpecialNeeds,
+                                      specialConditions: conditions,
+                                      specialConditionsOthers:
+                                          otherCondition,
                                     ),
                                   ),
                                 );
