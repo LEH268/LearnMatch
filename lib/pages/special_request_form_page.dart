@@ -47,7 +47,7 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
       // sent to firebase
       await _firestoreService.submitSpecialRequest(
         studentName: _nameController.text.trim(),
-        emergencyContact: _contactController.text.trim(),
+        className: _contactController.text.trim(),
         conditions: selectedConditions,
         others: _othersController.text.trim(),
       );
@@ -125,7 +125,7 @@ class _SpecialRequestFormPageState extends State<SpecialRequestFormPage> {
             ),
             TextField(
               controller: _contactController,
-              decoration: const InputDecoration(labelText: "Emergency Contact"),
+              decoration: const InputDecoration(labelText: "Class Name"),
             ),
             const SizedBox(height: 20),
 

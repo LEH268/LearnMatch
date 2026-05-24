@@ -30,30 +30,29 @@ class Student {
     this.personalityScores = const {},
   });
 
-  // 添加从 Firestore 解析的方法
+  
   factory Student.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>? ?? {};
     
     return Student(
       id: doc.id,
       name: data['name'] ?? 'Unknown',
-      className: data['className'] ?? 'Unassigned', // 如果没有分配班级则为 Unassigned
+      className: data['className'] ?? 'Unassigned', 
       emergencyContact: data['emergencyContact'] ?? '',
       grades: data['grades'] ?? '',
       basicInfo: data['basicInfo'] ?? '',
       specialConditions: data['specialConditions'] ?? '',
       aiCognitiveAnalysis: data['aiCognitiveAnalysis'] ?? '',
       aiAdaptivePath: data['aiAdaptivePath'] ?? '',
-      // 安全地解析 Map
+     
       varkScores: data['varkScores'] != null 
           ? Map<String, int>.from(data['varkScores']) 
           : {},
-      personalityScores: data['cognitiveScores'] != null // 根据你的 service，这里存的是 cognitiveScores
+      personalityScores: data['cognitiveScores'] != null 
           ? Map<String, int>.from(data['cognitiveScores']) 
           : {},
     );
   }
 
-  // 判断学生是否已经提交测试 (如果有 vark 成绩代表已提交)
   bool get hasSubmitted => varkScores.isNotEmpty; 
 }
