@@ -26,13 +26,12 @@ class FirestoreService {
   // ======================
   Future<void> saveStudentTestResult({
     required String name,
-    required String emergencyContact,
+    required String className,
     required Map<String, int> varkScores,
     required Map<String, int> cognitiveScores,
   }) async {
     await _db.collection('students').add({
       'name': name,
-      'emergencyContact': emergencyContact,
       'varkScores': varkScores,
       'cognitiveScores': cognitiveScores,
       'createdAt': FieldValue.serverTimestamp(),

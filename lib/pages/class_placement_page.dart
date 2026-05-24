@@ -139,7 +139,7 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
       setState(() {
         _previewResults = results;
         _state = results.isEmpty ? 'error' : 'preview_ready';
-        if (results.isEmpty) _errorMsg = 'No students with assessment data found.';
+        if (results.isEmpty) _errorMsg = 'No unassigned students with assessment data. (Students already in a class are skipped.)';
       });
     } catch (e) {
       setState(() {
@@ -451,12 +451,12 @@ class _ClassPlacementPageState extends State<ClassPlacementPage> {
           children: [
             const Text('Placement Preview', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
             const Spacer(),
-            Text('${_previewResults.length} students', style: const TextStyle(color: Colors.blueGrey)),
+            Text('${_previewResults.length} unassigned students', style: const TextStyle(color: Colors.blueGrey)),
           ],
         ),
         const SizedBox(height: 6),
         const Text(
-          'Review the proposed placement based on target VARK. Tap Confirm to save.',
+          'Only unassigned students will be placed. Students already in a class will keep their current placement.',
           style: TextStyle(color: Colors.blueGrey, fontSize: 13),
         ),
         const SizedBox(height: 20),

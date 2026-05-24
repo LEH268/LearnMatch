@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 
 class StudentEvaluationForm extends StatefulWidget {
   const StudentEvaluationForm({super.key});
@@ -9,30 +10,22 @@ class StudentEvaluationForm extends StatefulWidget {
       _StudentEvaluationFormState();
 }
 
-class _StudentEvaluationFormState
-    extends State<StudentEvaluationForm> {
-
-  // ==========================================
+class _StudentEvaluationFormState extends State<StudentEvaluationForm> {
+  // ──────────────────────────────────────────
   // Student Info
-  // ==========================================
+  // ──────────────────────────────────────────
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _classController = TextEditingController();
 
-  final TextEditingController _nameController =
-      TextEditingController();
-
-  final TextEditingController _classController =
-      TextEditingController();
-
-  // ==========================================
+  // ──────────────────────────────────────────
   // Question State
-  // ==========================================
-
+  // ──────────────────────────────────────────
   int _currentIndex = 0;
   bool _hasStarted = false;
   bool _isSavingToDatabase = false;
+  String _saveStatusMessage = 'Syncing to your student profile…';
 
-  final TextEditingController _answerController =
-      TextEditingController();
-
+  final TextEditingController _answerController = TextEditingController();
   final List<String> _answers = [];
 
   final List<String> _questions = [
@@ -43,29 +36,25 @@ class _StudentEvaluationFormState
     "5. What do you wish the class could do differently?",
   ];
 
-  // ==========================================
-  // Start Form
-  // ==========================================
+  // Same Gemini model pattern as pre_admission_report.dart
+  final _aiModel = GenerativeModel(
+    model: 'gemini-2.5-flash',
+    apiKey: '',
+  );
 
+  // ──────────────────────────────────────────
+  // Flow control
+  // ──────────────────────────────────────────
   void _startForm() {
     if (_nameController.text.trim().isEmpty ||
         _classController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please enter your name and class."),
-        ),
+        const SnackBar(content: Text("Please enter your name and class.")),
       );
       return;
     }
-
-    setState(() {
-      _hasStarted = true;
-    });
+    setState(() => _hasStarted = true);
   }
-
-  // ==========================================
-  // Submit Each Answer
-  // ==========================================
 
   void _submitAnswer() {
     if (_answerController.text.trim().isEmpty) {
@@ -74,7 +63,6 @@ class _StudentEvaluationFormState
       );
       return;
     }
-
     _answers.add(_answerController.text.trim());
     _answerController.clear();
 
@@ -87,68 +75,132 @@ class _StudentEvaluationFormState
     });
   }
 
-  // ==========================================
-  // Score each answer 1-5 from sentiment words.
-  // This is intentionally simple; the teacher's
-  // follow-up page just needs a real number per
-  // question instead of the old hardcoded 4s.
-  // ==========================================
-
-  int _scoreAnswer(String raw) {
-    final text = raw.toLowerCase();
-
-    const positive = [
-      'love', 'loved', 'great', 'amazing', 'fun', 'enjoy', 'enjoyed',
-      'happy', 'good', 'excellent', 'best', 'awesome', 'wonderful',
-      'helpful', 'nice', 'kind', 'support', 'supportive', 'comfortable',
-      'friend', 'friends', 'learn', 'learned', 'improved', 'better',
-      'fantastic', 'engaged', 'inspired'
-    ];
-    const negative = [
-      'hate', 'hated', 'bad', 'boring', 'awful', 'terrible', 'sad',
-      'angry', 'annoyed', 'difficult', 'hard', 'struggle', 'struggled',
-      'lonely', 'alone', 'bully', 'bullied', 'unfair', 'stress',
-      'stressed', 'tired', 'exhausted', 'confused', 'lost', 'failed'
-    ];
-
-    int score = 3; // neutral baseline
-    for (final w in positive) {
-      if (text.contains(w)) score++;
-    }
-    for (final w in negative) {
-      if (text.contains(w)) score--;
+  // ──────────────────────────────────────────
+  // AI scoring per question (1–5) + total (0–25)
+  // ──────────────────────────────────────────
+  Future<List<int>> _aiScoreAnswers(List<String> answers) async {
+    // Build a single prompt with all 5 answers so the AI returns
+    // scores in one call (cheaper + faster + more consistent).
+    final buffer = StringBuffer();
+    for (int i = 0; i < answers.length; i++) {
+      buffer.writeln('Q${i + 1}: ${_questions[i]}');
+      buffer.writeln('Answer: ${answers[i]}');
+      buffer.writeln();
     }
 
-    // Tiny boost so very long, considered answers nudge up slightly
-    if (raw.trim().split(RegExp(r'\s+')).length > 25) score++;
+    final prompt = """
+You are an Educational AI that evaluates how positive and engaged a student is from their end-of-year reflection answers.
 
-    return score.clamp(1, 5);
+For EACH answer below, give a score from 1 to 5:
+- 5 = very positive, engaged, happy, growth-minded
+- 4 = generally positive
+- 3 = neutral / mixed
+- 2 = generally negative
+- 1 = very negative, disengaged, unhappy
+
+Reflect on the SENTIMENT, EFFORT, and DETAIL of the answer.
+
+${buffer.toString()}
+
+Output ONLY the 5 scores on a single line, separated by commas, in order Q1,Q2,Q3,Q4,Q5.
+Example output: 4,3,5,2,4
+""";
+
+    try {
+      final response = await _aiModel.generateContent([Content.text(prompt)]);
+      final text = (response.text ?? '').trim();
+
+      // Parse the comma-separated digits. Be defensive — the model
+      // might add extra punctuation or text.
+      final numbers = RegExp(r'[1-5]')
+          .allMatches(text)
+          .map((m) => int.parse(m.group(0)!))
+          .toList();
+
+      if (numbers.length >= answers.length) {
+        return numbers.take(answers.length).toList();
+      }
+      // Fallback: pad with 3s (neutral) if AI returned too few
+      return [
+        ...numbers,
+        ...List.filled(answers.length - numbers.length, 3),
+      ];
+    } catch (_) {
+      // AI unavailable → neutral baseline. Teacher will still see
+      // the written answers and can use their own judgement.
+      return List.filled(answers.length, 3);
+    }
   }
 
-  // ==========================================
-  // Submit To Firebase
-  // Try to UPDATE the existing student doc that
-  // was created by the pre-admission test
-  // (matched by name + className). If none exists,
-  // fall back to creating a new one.
-  // ==========================================
+  // ──────────────────────────────────────────
+  // Find the existing student doc (case- and whitespace-insensitive).
+  // Returns null if no record exists yet.
+  // ──────────────────────────────────────────
+  Future<DocumentReference?> _findExistingStudentDoc(
+    String typedName,
+    String typedClass,
+  ) async {
+    final normalized = typedName.trim().toLowerCase();
+    final collection = FirebaseFirestore.instance.collection('students');
 
+    // We can't rely on .where('name', isEqualTo: ...) alone because
+    // Firestore is case-sensitive AND the pre-admission test may
+    // have stored the name with stray whitespace. So just pull all
+    // students (this collection is small per school) and compare
+    // ourselves. We prefer the one with VARK data (real profile).
+    final all = await collection.get();
+
+    DocumentSnapshot? namedMatch;
+    DocumentSnapshot? namedAndClassMatch;
+
+    for (final doc in all.docs) {
+      final data = doc.data();
+      final n = (data['name'] ?? '').toString().trim().toLowerCase();
+      if (n != normalized) continue;
+
+      // Prefer the doc that already has assessment data, because
+      // that's the real student profile we want to merge into.
+      final hasVark = (data['varkScores'] as Map?)?.isNotEmpty ?? false;
+      if (namedMatch == null) namedMatch = doc;
+      if (hasVark) namedMatch = doc;
+
+      final c = (data['className'] ?? '').toString().trim().toLowerCase();
+      if (c == typedClass.trim().toLowerCase()) {
+        namedAndClassMatch = doc;
+      }
+    }
+
+    // Prefer name + class match. Fall back to name-only.
+    final chosen = namedAndClassMatch ?? namedMatch;
+    return chosen?.reference;
+  }
+
+  // ──────────────────────────────────────────
+  // Submit
+  // ──────────────────────────────────────────
   Future<void> _submitFormToDatabase() async {
-    setState(() => _isSavingToDatabase = true);
+    setState(() {
+      _isSavingToDatabase = true;
+      _saveStatusMessage = 'AI is reviewing your answers…';
+    });
 
     try {
       final String name = _nameController.text.trim();
       final String className = _classController.text.trim();
 
-      // Real scores derived from the answers
-      final detailedAnswers =
-          _answers.map(_scoreAnswer).toList();
+      // 1. AI scores the answers
+      final detailedAnswers = await _aiScoreAnswers(_answers);
       final evaluationScore =
           detailedAnswers.fold<int>(0, (sum, v) => sum + v);
 
-      final payload = <String, dynamic>{
-        'name': name,
-        'className': className,
+      if (mounted) {
+        setState(() => _saveStatusMessage = 'Syncing to your student profile…');
+      }
+
+      // 2. Find the existing student doc (created by pre-admission test)
+      final existingRef = await _findExistingStudentDoc(name, className);
+
+      final evaluationPayload = <String, dynamic>{
         'hasSubmittedForm': true,
         'evaluationSubmitted': true,
         'evaluationScore': evaluationScore,
@@ -157,58 +209,42 @@ class _StudentEvaluationFormState
         'submittedAt': Timestamp.now(),
       };
 
-      final collection =
-          FirebaseFirestore.instance.collection('students');
+      bool merged;
+      if (existingRef != null) {
+        // MERGE — keeps varkScores / personalityScores / placement intact.
+        // Don't overwrite name or className unless missing.
+        final existing = await existingRef.get();
+        final eData = existing.data() as Map<String, dynamic>? ?? {};
 
-      // 1) Try to find an existing student doc with the same name.
-      //    We match on name (case-insensitive) so the teacher's
-      //    follow-up page sees the SAME record they were already
-      //    tracking, instead of a duplicate.
-      final query = await collection
-          .where('name', isEqualTo: name)
-          .limit(1)
-          .get();
-
-      QueryDocumentSnapshot<Map<String, dynamic>>? match;
-      if (query.docs.isNotEmpty) {
-        match = query.docs.first;
+        await existingRef.set({
+          ...evaluationPayload,
+          'name': (eData['name'] ?? name),
+          'className': ((eData['className'] ?? '').toString().isEmpty
+              ? className
+              : eData['className']),
+        }, SetOptions(merge: true));
+        merged = true;
       } else {
-        // Fallback: case-insensitive scan in case the name was
-        // stored with a different capitalisation.
-        final all = await collection.get();
-        for (final doc in all.docs) {
-          final n = (doc.data()['name'] ?? '').toString().trim();
-          if (n.toLowerCase() == name.toLowerCase()) {
-            match = doc;
-            break;
-          }
-        }
+        // Genuinely new student — only happens if student skipped
+        // pre-admission entirely.
+        await FirebaseFirestore.instance.collection('students').add({
+          'name': name,
+          'className': className,
+          ...evaluationPayload,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        merged = false;
       }
-
-      if (match != null) {
-        // Merge into existing doc — keeps varkScores etc. intact
-        await match.reference.set(payload, SetOptions(merge: true));
-      } else {
-        // No existing student → create new
-        await collection.add(payload);
-      }
-
-      await Future.delayed(const Duration(milliseconds: 600));
 
       if (!mounted) return;
       setState(() => _isSavingToDatabase = false);
-
-      // ==========================================
-      // Success Dialog
-      // ==========================================
 
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+              borderRadius: BorderRadius.circular(16)),
           title: const Column(
             children: [
               Icon(Icons.check_circle, color: Colors.green, size: 50),
@@ -218,7 +254,9 @@ class _StudentEvaluationFormState
             ],
           ),
           content: Text(
-            'Your response has been synced to the teacher dashboard.\n\nYour total score: $evaluationScore / 25',
+            merged
+                ? 'Your evaluation has been AI-scored and synced to your existing student profile.\n\nAI Score: $evaluationScore / 25'
+                : 'Your evaluation has been AI-scored and recorded.\n\nAI Score: $evaluationScore / 25',
             textAlign: TextAlign.center,
           ),
           actions: [
@@ -247,14 +285,12 @@ class _StudentEvaluationFormState
     }
   }
 
-  // ==========================================
+  // ──────────────────────────────────────────
   // UI
-  // ==========================================
-
+  // ──────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    double progress =
-        (_currentIndex + 1) / _questions.length;
+    final progress = (_currentIndex + 1) / _questions.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2FBFA),
@@ -275,34 +311,25 @@ class _StudentEvaluationFormState
               : !_hasStarted
                   ? _buildStudentInfoPage()
                   : Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(10),
                           child: LinearProgressIndicator(
                             value: progress,
-                            backgroundColor:
-                                Colors.grey.shade300,
+                            backgroundColor: Colors.grey.shade300,
                             color: Colors.deepPurpleAccent,
                             minHeight: 12,
                           ),
                         ),
                         const SizedBox(height: 24),
-                        Expanded(
-                          child: _buildQuestionPage(),
-                        ),
+                        Expanded(child: _buildQuestionPage()),
                       ],
                     ),
         ),
       ),
     );
   }
-
-  // ==========================================
-  // Student Info Page
-  // ==========================================
 
   Widget _buildStudentInfoPage() {
     return Column(
@@ -311,16 +338,14 @@ class _StudentEvaluationFormState
         const SizedBox(height: 40),
         const Icon(Icons.school, size: 80, color: Colors.deepPurple),
         const SizedBox(height: 20),
-        const Text(
-          "Student Information",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-        ),
+        const Text("Student Information",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         const Text(
-          "Use the same name you used for the pre-admission test so your evaluation links to your existing profile.",
+          "Please use the SAME name and class you used for the pre-admission test, so your evaluation links to your profile.",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+          style: TextStyle(fontSize: 12, color: Colors.blueGrey, height: 1.4),
         ),
         const SizedBox(height: 40),
         TextField(
@@ -329,9 +354,7 @@ class _StudentEvaluationFormState
             labelText: "Student Name",
             filled: true,
             fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
           ),
         ),
         const SizedBox(height: 20),
@@ -341,9 +364,7 @@ class _StudentEvaluationFormState
             labelText: "Class Name",
             filled: true,
             fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
           ),
         ),
         const SizedBox(height: 40),
@@ -353,33 +374,26 @@ class _StudentEvaluationFormState
             backgroundColor: Colors.deepPurple,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 18),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
-          child: const Text(
-            "Start Evaluation",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          child: const Text("Start Evaluation",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ),
       ],
     );
   }
 
-  // ==========================================
-  // Saving Screen
-  // ==========================================
-
   Widget _buildSavingScreen() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: Colors.deepPurple),
-          SizedBox(height: 20),
+          const CircularProgressIndicator(color: Colors.deepPurple),
+          const SizedBox(height: 20),
           Text(
-            'Syncing to School Database...',
-            style: TextStyle(
+            _saveStatusMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.deepPurple,
@@ -390,33 +404,25 @@ class _StudentEvaluationFormState
     );
   }
 
-  // ==========================================
-  // Question Page
-  // ==========================================
-
   Widget _buildQuestionPage() {
-    String currentQuestion = _questions[_currentIndex];
+    final currentQuestion = _questions[_currentIndex];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          "Question ${_currentIndex + 1}",
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.blueGrey,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text("Question ${_currentIndex + 1}",
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.blueGrey,
+              fontWeight: FontWeight.bold,
+            )),
         const SizedBox(height: 12),
-        Text(
-          currentQuestion,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
+        Text(currentQuestion,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            )),
         const SizedBox(height: 30),
         TextField(
           controller: _answerController,
@@ -438,18 +444,13 @@ class _StudentEvaluationFormState
             backgroundColor: Colors.deepPurple,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 18),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           child: Text(
             _currentIndex == _questions.length - 1
                 ? "Submit Evaluation"
                 : "Next Question",
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
       ],
