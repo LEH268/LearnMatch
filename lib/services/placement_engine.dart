@@ -82,16 +82,38 @@ class PlacementEngine {
   }
 
   // ── Preview placement WITHOUT saving ──────────
+  //
+  // [onlyUnassigned] (default true) skips students who already have
+  // a className set. This is what the One-Click Class Placement
+  // button in assessment_link_page calls — admin doesn't want
+  // existing placed students to be re-shuffled.
   Future<List<PlacementResult>> previewPlacement(
-      List<Map<String, dynamic>> existingClasses) async {
+      List<Map<String, dynamic>> existingClasses,
+      {bool onlyUnassigned = true}) async {
     final snapshot = await _db.collection('students').get();
     final results = <PlacementResult>[];
     final classCounts = <String, int>{};
+
+    // Seed classCounts with current class sizes so newly-placed
+    // students load-balance against existing ones.
+    if (onlyUnassigned) {
+      for (final doc in snapshot.docs) {
+        final cn = (doc.data()['className'] ?? '').toString().trim();
+        if (cn.isNotEmpty && cn != 'Unassigned') {
+          classCounts[cn] = (classCounts[cn] ?? 0) + 1;
+        }
+      }
+    }
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final varkRaw = data['varkScores'];
       if (varkRaw == null) continue;
+
+      if (onlyUnassigned) {
+        final cn = (data['className'] ?? '').toString().trim();
+        if (cn.isNotEmpty && cn != 'Unassigned') continue;
+      }
 
       final varkScores = Map<String, int>.from(varkRaw);
       final dominant = getDominantStyle(varkScores);
@@ -112,11 +134,23 @@ class PlacementEngine {
 
   // ── Run placement and SAVE to Firestore ────────
   Future<List<PlacementResult>> runPlacement(
-      List<Map<String, dynamic>> existingClasses) async {
+      List<Map<String, dynamic>> existingClasses,
+      {bool onlyUnassigned = true}) async {
     final snapshot = await _db.collection('students').get();
     final results = <PlacementResult>[];
     final classStudentMap = <String, List<String>>{};
     final classCounts = <String, int>{};
+
+    // Pre-fill counts from existing placements so new placements
+    // balance load against current sizes.
+    if (onlyUnassigned) {
+      for (final doc in snapshot.docs) {
+        final cn = (doc.data()['className'] ?? '').toString().trim();
+        if (cn.isNotEmpty && cn != 'Unassigned') {
+          classCounts[cn] = (classCounts[cn] ?? 0) + 1;
+        }
+      }
+    }
 
     final WriteBatch batch = _db.batch();
 
@@ -124,6 +158,11 @@ class PlacementEngine {
       final data = doc.data();
       final varkRaw = data['varkScores'];
       if (varkRaw == null) continue;
+
+      if (onlyUnassigned) {
+        final cn = (data['className'] ?? '').toString().trim();
+        if (cn.isNotEmpty && cn != 'Unassigned') continue;
+      }
 
       final varkScores = Map<String, int>.from(varkRaw);
       final dominant = getDominantStyle(varkScores);
@@ -148,14 +187,30 @@ class PlacementEngine {
 
     await batch.commit();
 
-    // Update class documents with student counts
+    // Update class documents with student counts.
+    // Important: when onlyUnassigned=true we MERGE the new IDs into the
+    // existing studentIds array rather than overwriting it, otherwise
+    // already-placed students would get wiped from the class record.
     for (final entry in classStudentMap.entries) {
-      await _db.collection('classes').doc(entry.key).set({
-        'className': entry.key,
-        'studentIds': entry.value,
-        'studentCount': entry.value.length,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      if (onlyUnassigned) {
+        final ref = _db.collection('classes').doc(entry.key);
+        await ref.set({
+          'className': entry.key,
+          'studentIds': FieldValue.arrayUnion(entry.value),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        // Recompute studentCount as an explicit number
+        final after = await ref.get();
+        final ids = (after.data()?['studentIds'] as List?) ?? [];
+        await ref.update({'studentCount': ids.length});
+      } else {
+        await _db.collection('classes').doc(entry.key).set({
+          'className': entry.key,
+          'studentIds': entry.value,
+          'studentCount': entry.value.length,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
     }
 
     return results;

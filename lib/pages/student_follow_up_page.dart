@@ -14,6 +14,7 @@ class StudentRecord {
   final bool hasSubmittedForm;
   final int? evaluationScore;
   final List<int>? detailedAnswers;
+  final List<String>? writtenAnswers;
   final String className;
 
   StudentRecord({
@@ -22,6 +23,7 @@ class StudentRecord {
     required this.hasSubmittedForm,
     this.evaluationScore,
     this.detailedAnswers,
+    this.writtenAnswers,
     this.className = 'No Class',
   });
 }
@@ -89,6 +91,9 @@ class _StudentFollowUpPageState extends State<StudentFollowUpPage> {
           evaluationScore: int.tryParse(data['evaluationScore']?.toString() ?? ''),
           detailedAnswers: (data['detailedAnswers'] as List<dynamic>?)
               ?.map((e) => int.tryParse(e.toString()) ?? 0)
+              .toList(),
+          writtenAnswers: (data['writtenAnswers'] as List<dynamic>?)
+              ?.map((e) => e.toString())
               .toList(),
         );
       }).toList();
@@ -463,6 +468,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   bool _isDataFetched = false;
   int _fetchedStudentEvalScore = 0;
   List<int> _fetchedDetailedAnswers = [];
+  List<String> _fetchedWrittenAnswers = [];
   bool _isGeneratingAI = false;
   
   final aiModel = GenerativeModel(
@@ -517,6 +523,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         _isDataFetched = true;
         _fetchedStudentEvalScore = widget.student.evaluationScore ?? 0;
         _fetchedDetailedAnswers = widget.student.detailedAnswers ?? [];
+        _fetchedWrittenAnswers = widget.student.writtenAnswers ?? [];
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Successfully synced data for ${widget.student.name}.'), backgroundColor: Colors.green),
@@ -539,65 +546,158 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${widget.student.name}\'s Form Details',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 10),
-              ...List.generate(_formQuestions.length, (index) {
-                int score = _fetchedDetailedAnswers.isNotEmpty && index < _fetchedDetailedAnswers.length
-                    ? _fetchedDetailedAnswers[index]
-                    : 0;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(_formQuestions[index],
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          ...List.generate(5, (starIndex) {
-                            return Icon(
-                              starIndex < score ? Icons.star : Icons.star_border,
-                              color: Colors.amber,
-                              size: 20,
-                            );
-                          }),
-                          const SizedBox(width: 8),
-                          Text('$score / 5', style: TextStyle(color: Colors.grey.shade700)),
-                        ],
-                      )
+                      Expanded(
+                        child: Text("${widget.student.name}'s Submission",
+                            style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepPurple)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
                     ],
                   ),
-                );
-              }),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
-                  child: const Text('Close'),
-                ),
-              )
-            ],
-          ),
+                  Container(
+                    margin: const EdgeInsets.only(top: 4, bottom: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.deepPurple.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'AI Sentiment Score: $_fetchedStudentEvalScore / 25',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple),
+                    ),
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: _formQuestions.length,
+                      itemBuilder: (_, index) {
+                        final int aiScore =
+                            (_fetchedDetailedAnswers.length > index)
+                                ? _fetchedDetailedAnswers[index]
+                                : 0;
+                        final String answer =
+                            (_fetchedWrittenAnswers.length > index)
+                                ? _fetchedWrittenAnswers[index]
+                                : '(no response)';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 18),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(_formQuestions[index],
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14)),
+                              const SizedBox(height: 6),
+                              // Student's actual written answer
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius:
+                                      BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: Colors.grey.shade200),
+                                ),
+                                child: Text(answer,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.black87,
+                                        height: 1.4)),
+                              ),
+                              const SizedBox(height: 8),
+                              // AI score bar
+                              Row(
+                                children: [
+                                  const Icon(
+                                      Icons.auto_awesome_rounded,
+                                      size: 14,
+                                      color: Colors.deepPurple),
+                                  const SizedBox(width: 6),
+                                  const Text('AI Score: ',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.blueGrey,
+                                          fontWeight:
+                                              FontWeight.w600)),
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius:
+                                          BorderRadius.circular(6),
+                                      child: LinearProgressIndicator(
+                                        value: aiScore / 5,
+                                        backgroundColor: Colors
+                                            .deepPurple
+                                            .withOpacity(0.12),
+                                        color: _scoreColor(aiScore),
+                                        minHeight: 8,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text('$aiScore / 5',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight:
+                                              FontWeight.bold,
+                                          color:
+                                              _scoreColor(aiScore))),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple,
+                          foregroundColor: Colors.white),
+                      child: const Text('Close'),
+                    ),
+                  )
+                ],
+              ),
+            );
+          },
         );
       },
     );
+  }
+
+  Color _scoreColor(int score) {
+    if (score >= 4) return Colors.green;
+    if (score == 3) return Colors.amber.shade700;
+    return Colors.redAccent;
   }
 
   // AI analysis and recommendation generation
@@ -612,49 +712,125 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
       return;
     }
 
-    double avgGrade = _calculateAverageGrade();
-    String gradeLetter = _getGradeLetter(avgGrade);
-    String teacherComment = _teacherCommentController.text;
-    
-    if (teacherComment.isEmpty) {
-      teacherComment = "No specific observation provided by the teacher.";
-    }
+    final double avgGrade = _calculateAverageGrade();          // 0–100
+    final String gradeLetter = _getGradeLetter(avgGrade);
+    final String teacherComment = _teacherCommentController.text.trim();
 
-    setState(() {
-      _isGeneratingAI = true;
-    });
+    setState(() => _isGeneratingAI = true);
 
     try {
-      final prompt = """
-You are an expert Educational AI Assistant helping a teacher evaluate a student for next year's class placement (Re-streaming).
+      // ───────────────────────────────────────────────
+      // STEP 1. AI scores the teacher's written comment
+      // (returns 0–100 score + a brief analysis)
+      // ───────────────────────────────────────────────
+      int teacherAiScore = 50; // neutral default if AI fails / no comment
+      String teacherAnalysis =
+          'No specific observation provided by the teacher.';
 
-Student Name: ${widget.student.name}
-Yearly Average Grade: $avgGrade / 100 ($gradeLetter)
-Student Self-Evaluation Score: $_fetchedStudentEvalScore / 25 (Higher score means they are happier and more engaged)
-Teacher's Observation: "$teacherComment"
+      if (teacherComment.isNotEmpty) {
+        try {
+          final teacherPrompt = """
+You are an Educational AI evaluating how well a student is fitting into their current class, based on the teacher's written observation.
 
-Based on this data, provide:
-1. Analysis: A 2-sentence psychological and academic analysis of the student's current state.
-2. Recommendation: A 1-sentence clear recommendation on whether they should stay in the current class pace, move to a different level, or need special tutoring.
+Teacher's observation: "$teacherComment"
+
+Score this observation from 0 to 100:
+- 80-100: very positive (student thriving, engaged, doing well)
+- 50-79:  acceptable (some concerns but mostly fine)
+- 20-49:  concerning (struggling, disengaged, or behavioural issues)
+- 0-19:   serious problems
 
 Format your response EXACTLY like this:
-Analysis: [Your analysis]
-Recommendation: [Your recommendation]
+Score: <number 0-100>
+Analysis: <2-sentence summary of what the teacher's observation tells us about the student's fit>
 """;
 
-      final response = await aiModel.generateContent([Content.text(prompt)]);
-      final rawText = response.text ?? "";
+          final tResp =
+              await aiModel.generateContent([Content.text(teacherPrompt)]);
+          final tText = (tResp.text ?? '').trim();
+          final scoreMatch =
+              RegExp(r'Score:\s*(\d{1,3})').firstMatch(tText);
+          if (scoreMatch != null) {
+            teacherAiScore =
+                int.parse(scoreMatch.group(1)!).clamp(0, 100);
+          }
+          final analysisMatch =
+              RegExp(r'Analysis:\s*(.+)', dotAll: true).firstMatch(tText);
+          if (analysisMatch != null) {
+            teacherAnalysis = analysisMatch.group(1)!.trim();
+          }
+        } catch (_) {
+          teacherAnalysis =
+              "AI could not analyse the teacher's observation. Comment: $teacherComment";
+        }
+      }
 
-      String finalAnalysis = "Analysis failed to generate properly.";
-      String finalRecommendation = "Recommendation failed to generate properly.";
+      // ───────────────────────────────────────────────
+      // STEP 2. Convert the 3 source scores onto a 0-100
+      // scale so they can be combined fairly:
+      //   - Academic grade:      already 0-100
+      //   - Student AI score:    0-25  →  ×4 to get 0-100
+      //   - Teacher AI score:    already 0-100
+      // ───────────────────────────────────────────────
+      final double studentAiPct =
+          (_fetchedStudentEvalScore / 25.0) * 100;
+      final double teacherAiPct = teacherAiScore.toDouble();
+      final double academicPct = avgGrade;
 
-      if (rawText.contains("Analysis:") && rawText.contains("Recommendation:")) {
-        final parts = rawText.split("Recommendation:");
-        finalAnalysis = parts[0].replaceAll("Analysis:", "").trim();
-        finalRecommendation = parts[1].trim();
-      } else {
-        finalAnalysis = rawText;
-        finalRecommendation = "Please refer to the analysis above.";
+      // Weighted blend (tweak these if you want a different bias).
+      // Equal-ish weight: academic 0.40, student feeling 0.30, teacher 0.30.
+      final double fitScore = (academicPct * 0.40 +
+              studentAiPct * 0.30 +
+              teacherAiPct * 0.30)
+          .clamp(0, 100);
+
+      // ───────────────────────────────────────────────
+      // STEP 3. Ask AI for a final combined recommendation
+      // grounded in all three numbers
+      // ───────────────────────────────────────────────
+      String finalAnalysis = teacherAnalysis;
+      String finalRecommendation = '';
+
+      try {
+        final finalPrompt = """
+You are an educational AI helping a teacher decide whether a student fits well in their current class for next academic year.
+
+Three indicators:
+1. Academic average:         ${avgGrade.toStringAsFixed(1)} / 100  ($gradeLetter)
+2. Student self-evaluation:  $_fetchedStudentEvalScore / 25  (AI-scored from their written reflections)
+3. Teacher observation:      $teacherAiScore / 100  (AI-scored from teacher comment)
+
+Combined fit score: ${fitScore.toStringAsFixed(1)} / 100
+
+Decision rules:
+- 75+: Student is a great fit. Recommend staying in current class.
+- 55-74: Acceptable fit but watch certain areas. Recommend staying with adjustments.
+- 35-54: Mismatched. Recommend re-streaming to a different class pace or learning style.
+- Below 35: Serious mismatch. Recommend intervention (tutoring, counselling, or class change).
+
+Output EXACTLY like this:
+Analysis: <2-sentence summary that connects the three indicators>
+Recommendation: <1-sentence clear action recommendation>
+""";
+
+        final fResp =
+            await aiModel.generateContent([Content.text(finalPrompt)]);
+        final fText = (fResp.text ?? '').trim();
+
+        if (fText.contains('Analysis:') &&
+            fText.contains('Recommendation:')) {
+          final parts = fText.split('Recommendation:');
+          finalAnalysis =
+              parts[0].replaceAll('Analysis:', '').trim();
+          finalRecommendation = parts[1].trim();
+        } else {
+          finalAnalysis = fText;
+          finalRecommendation =
+              _ruleBasedRecommendation(fitScore);
+        }
+      } catch (_) {
+        // AI failed → fall back to rule-based recommendation
+        finalRecommendation = _ruleBasedRecommendation(fitScore);
       }
 
       if (mounted) {
@@ -670,8 +846,11 @@ Recommendation: [Your recommendation]
               gradeLetter: gradeLetter,
               evaluationScore: _fetchedStudentEvalScore,
               hasEvalData: _isDataFetched,
-              aiAnalysis: finalAnalysis,            
-              recommendation: finalRecommendation,  
+              teacherAiScore: teacherAiScore,
+              teacherComment: teacherComment,
+              fitScore: fitScore,
+              aiAnalysis: finalAnalysis,
+              recommendation: finalRecommendation,
             ),
           ),
         );
@@ -682,11 +861,22 @@ Recommendation: [Your recommendation]
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isGeneratingAI = false;
-        });
+        setState(() => _isGeneratingAI = false);
       }
     }
+  }
+
+  String _ruleBasedRecommendation(double fitScore) {
+    if (fitScore >= 75) {
+      return 'Student is fitting well in this class — recommend staying.';
+    }
+    if (fitScore >= 55) {
+      return 'Acceptable fit. Continue monitoring but no class change required.';
+    }
+    if (fitScore >= 35) {
+      return 'Mismatch detected. Consider re-streaming to a different class.';
+    }
+    return 'Serious fit issue — intervention recommended (tutoring or class change).';
   }
 
   @override
@@ -838,8 +1028,11 @@ class YearlyReportPage extends StatelessWidget {
   final double? secondHalfGrade;
   final double averageGrade;
   final String gradeLetter;
-  final int evaluationScore;
+  final int evaluationScore;       // student AI score 0-25
   final bool hasEvalData;
+  final int teacherAiScore;        // teacher AI score 0-100
+  final String teacherComment;
+  final double fitScore;           // combined 0-100
   final String aiAnalysis;
   final String recommendation;
 
@@ -853,14 +1046,33 @@ class YearlyReportPage extends StatelessWidget {
     required this.gradeLetter,
     required this.evaluationScore,
     required this.hasEvalData,
+    required this.teacherAiScore,
+    required this.teacherComment,
+    required this.fitScore,
     required this.aiAnalysis,
     required this.recommendation,
   }) : super(key: key);
 
+  Color _fitColor() {
+    if (fitScore >= 75) return Colors.green;
+    if (fitScore >= 55) return Colors.amber.shade700;
+    if (fitScore >= 35) return Colors.orange;
+    return Colors.redAccent;
+  }
+
+  String _fitVerdict() {
+    if (fitScore >= 75) return 'Great fit';
+    if (fitScore >= 55) return 'Acceptable fit';
+    if (fitScore >= 35) return 'Mismatch';
+    return 'Serious mismatch';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('$studentName\'s Report'), backgroundColor: Colors.deepPurple),
+      appBar: AppBar(
+          title: Text('$studentName\'s Report'),
+          backgroundColor: Colors.deepPurple),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -869,33 +1081,111 @@ class YearlyReportPage extends StatelessWidget {
             const Icon(Icons.school, size: 60, color: Colors.deepPurple),
             const SizedBox(height: 10),
             Text('AI Re-streaming Report\n$studentName',
-                textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 30),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 24),
+
+            // ── COMBINED FIT SCORE (the headline) ──
             Card(
-              elevation: 3,
-              child: ListTile(
-                title: const Text('Academic Performance',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-                subtitle: Text(
-                  'Academic Year: $academicYear\n'
-                  'First Half Year: ${firstHalfGrade != null ? firstHalfGrade!.toStringAsFixed(1) : 'N/A'}\n'
-                  'Second Half Year: ${secondHalfGrade != null ? secondHalfGrade!.toStringAsFixed(1) : 'N/A'}\n'
-                  '-------------------------\n'
-                  'Yearly Average: ${averageGrade.toStringAsFixed(1)}/100\n'
-                  'Final Grade: $gradeLetter'
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: LinearGradient(
+                    colors: [
+                      _fitColor().withOpacity(0.18),
+                      _fitColor().withOpacity(0.04),
+                    ],
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    const Text('Class Fit Score',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54,
+                            letterSpacing: 1.2)),
+                    const SizedBox(height: 6),
+                    Text('${fitScore.toStringAsFixed(1)} / 100',
+                        style: TextStyle(
+                            fontSize: 38,
+                            fontWeight: FontWeight.bold,
+                            color: _fitColor())),
+                    const SizedBox(height: 4),
+                    Text(_fitVerdict(),
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _fitColor())),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: fitScore / 100,
+                        backgroundColor: _fitColor().withOpacity(0.15),
+                        color: _fitColor(),
+                        minHeight: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Composed of  Academic 40% • Student 30% • Teacher 30%',
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.black54),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            Card(
-              elevation: 3,
-              child: ListTile(
-                title: const Text('Student Self-Evaluation',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-                subtitle: Text(hasEvalData ? 'Satisfaction Score: $evaluationScore / 25' : 'No data submitted by student.'),
-              ),
+            const SizedBox(height: 16),
+
+            // ── 3 component scores ──
+            _scoreCard(
+              icon: Icons.menu_book_rounded,
+              color: Colors.blue,
+              title: 'Academic Performance',
+              valueLabel: '${averageGrade.toStringAsFixed(1)} / 100',
+              gradeLabel: gradeLetter,
+              progress: averageGrade / 100,
+              subtitle:
+                  '$academicYear  •  H1: ${firstHalfGrade != null ? firstHalfGrade!.toStringAsFixed(1) : 'N/A'}  •  H2: ${secondHalfGrade != null ? secondHalfGrade!.toStringAsFixed(1) : 'N/A'}',
             ),
             const SizedBox(height: 10),
+            _scoreCard(
+              icon: Icons.psychology_rounded,
+              color: Colors.deepPurple,
+              title: 'Student AI Evaluation',
+              valueLabel: hasEvalData
+                  ? '$evaluationScore / 25'
+                  : 'Not Submitted',
+              gradeLabel: hasEvalData
+                  ? '${((evaluationScore / 25) * 100).round()}%'
+                  : '',
+              progress: hasEvalData ? evaluationScore / 25 : 0,
+              subtitle:
+                  'AI scored the student\'s written reflections on classmates, teachers, and growth.',
+            ),
+            const SizedBox(height: 10),
+            _scoreCard(
+              icon: Icons.rate_review_rounded,
+              color: Colors.teal,
+              title: 'Teacher AI Evaluation',
+              valueLabel: '$teacherAiScore / 100',
+              gradeLabel: '',
+              progress: teacherAiScore / 100,
+              subtitle: teacherComment.isEmpty
+                  ? 'No teacher observation was provided.'
+                  : '"${teacherComment.length > 90 ? "${teacherComment.substring(0, 90)}…" : teacherComment}"',
+            ),
+            const SizedBox(height: 16),
+
+            // ── AI analysis ──
             Card(
               elevation: 3,
               color: Colors.blue.shade50,
@@ -904,14 +1194,21 @@ class YearlyReportPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('AI Comment Analysis', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                    const Text('AI Combined Analysis',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueAccent)),
                     const SizedBox(height: 8),
-                    Text(aiAnalysis, style: const TextStyle(fontStyle: FontStyle.italic)),
+                    Text(aiAnalysis,
+                        style:
+                            const TextStyle(fontStyle: FontStyle.italic)),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 10),
+
+            // ── Final recommendation ──
             Card(
               elevation: 3,
               color: Colors.green.shade50,
@@ -921,13 +1218,96 @@ class YearlyReportPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('Final Placement Recommendation',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green)),
                     const SizedBox(height: 8),
-                    Text(recommendation, style: const TextStyle(fontWeight: FontWeight.w500)),
+                    Text(recommendation,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w500, height: 1.5)),
                   ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _scoreCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String valueLabel,
+    required String gradeLabel,
+    required double progress,
+    required String subtitle,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(title,
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                          fontSize: 15)),
+                ),
+                Text(valueLabel,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                        fontSize: 14)),
+                if (gradeLabel.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(gradeLabel,
+                        style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12)),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progress.clamp(0.0, 1.0),
+                backgroundColor: color.withOpacity(0.12),
+                color: color,
+                minHeight: 8,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(subtitle,
+                style: const TextStyle(
+                    fontSize: 12, color: Colors.black54, height: 1.4)),
           ],
         ),
       ),

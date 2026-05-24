@@ -58,6 +58,12 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
   // so manually-arranged layouts don't snap back when data updates.
   final Map<String, Offset> _positionOverrides = {};
 
+  // Special-needs student IDs, captured from the latest Firestore snapshot.
+  // Used by _buildBeautifulNodeWidget to paint those nodes red.
+  Set<String> _specialNeedsIds = {};
+  // Same map but to surface the actual conditions in the profile dialog.
+  Map<String, Map<String, dynamic>> _specialNeedsDetails = {};
+
   @override
   void initState() {
     super.initState();
@@ -478,6 +484,17 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
         'Dominant learning style: $varkLabel. Personality trait: $pLabel.';
     final adaptivePath = _adaptivePath(varkLabel, pLabel);
 
+    final bool isSpecial = _specialNeedsIds.contains(student.id);
+    final details = _specialNeedsDetails[student.id];
+    final List<String> conditions =
+        (details?['conditions'] as List?)?.cast<String>() ?? const [];
+    final String otherCondition = (details?['others'] ?? '').toString();
+    final Color avatarBg = isSpecial
+        ? const Color(0xFFD32F2F).withOpacity(0.12)
+        : Colors.blue.withOpacity(0.12);
+    final Color avatarFg =
+        isSpecial ? const Color(0xFFD32F2F) : Colors.blue;
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -486,17 +503,41 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundColor: Colors.blue.withOpacity(0.12),
-              child: const Icon(Icons.person, color: Colors.blue),
+              backgroundColor: avatarBg,
+              child: Icon(isSpecial ? Icons.flag_rounded : Icons.person,
+                  color: avatarFg),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(student.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 20)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(student.name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 20)),
+                      ),
+                      if (isSpecial)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD32F2F),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Special',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   Text(
                     student.className.isEmpty
                         ? 'Unassigned'
@@ -513,7 +554,58 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
           child: SingleChildScrollView(
             child: Column(
               children: [
-                // Gradient AI insight card (matches the look you wanted)
+                // Red banner when flagged
+                if (isSpecial) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: const Color(0xFFD32F2F), width: 1.5),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.priority_high_rounded,
+                            color: Color(0xFFD32F2F)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Special Needs Flagged',
+                                  style: TextStyle(
+                                      color: Color(0xFFD32F2F),
+                                      fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text(
+                                () {
+                                  final all = [
+                                    ...conditions,
+                                    if (otherCondition.isNotEmpty)
+                                      otherCondition,
+                                  ];
+                                  return all.isEmpty
+                                      ? 'Parent has submitted a special request.'
+                                      : 'Conditions: ${all.join(", ")}';
+                                }(),
+                                style: const TextStyle(
+                                  color: Color(0xFFB71C1C),
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 _buildInsightCard(aiInsight, adaptivePath),
                 const SizedBox(height: 20),
 
@@ -691,6 +783,27 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
             _legendItem(Colors.orange.shade300, 'Teacher ↔ Class'),
             const SizedBox(height: 6),
             _legendItem(const Color(0xFF0066FF), 'Student ↔ Class'),
+            const SizedBox(height: 6),
+            // Special needs legend row (uses flag icon, not a line)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFD32F2F),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.priority_high_rounded,
+                      size: 10, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                const Text('Special Needs Student',
+                    style: TextStyle(
+                        fontSize: 11, color: Color(0xFFD32F2F),
+                        fontWeight: FontWeight.bold)),
+              ],
+            ),
             const SizedBox(height: 8),
             const Text('Tap class to expand',
                 style: TextStyle(fontSize: 10, color: Colors.blueGrey)),
@@ -734,6 +847,10 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
     final bool isFocused = _expandedClassIds.contains(node.id) ||
         _focusedTeacherId == node.id;
 
+    // Is this a special-needs student node?
+    final bool isSpecialNeeds = node.type == NodeType.studentNode &&
+        _specialNeedsIds.contains(node.id);
+
     switch (node.type) {
       case NodeType.classNode:
         primaryColor =
@@ -745,70 +862,122 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
         icon = Icons.school_rounded;
         break;
       case NodeType.studentNode:
-        primaryColor = Colors.blue;
-        icon = Icons.person;
+        // Red for flagged students so they pop in the network view.
+        primaryColor =
+            isSpecialNeeds ? const Color(0xFFD32F2F) : Colors.blue;
+        icon = isSpecialNeeds ? Icons.flag_rounded : Icons.person;
         break;
     }
 
-    return Container(
-      width: nodeSize,
-      height: 125,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: primaryColor.withOpacity(0.22),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // ICON
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: primaryColor.withOpacity(0.12),
-            ),
-            child: Icon(icon, color: primaryColor, size: 28),
-          ),
-          const SizedBox(height: 10),
-
-          // TITLE
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              node.label,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 10,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: nodeSize,
+          height: 125,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            // Add an extra coloured outline for special-needs nodes
+            border: isSpecialNeeds
+                ? Border.all(
+                    color: const Color(0xFFD32F2F), width: 2.5)
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(isSpecialNeeds ? 0.35 : 0.22),
+                blurRadius: isSpecialNeeds ? 28 : 24,
+                offset: const Offset(0, 12),
               ),
-            ),
+            ],
           ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // ICON
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: primaryColor.withOpacity(0.12),
+                ),
+                child: Icon(icon, color: primaryColor, size: 28),
+              ),
+              const SizedBox(height: 10),
 
-          // TEACHER SUBJECTS
-          if (node.type == NodeType.teacherNode)
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Text(
-                (node.data as Teacher).subjects.join(', '),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 8,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
+              // TITLE
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  node.label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                    color: isSpecialNeeds
+                        ? const Color(0xFFD32F2F)
+                        : Colors.black87,
+                  ),
                 ),
               ),
+
+              // TEACHER SUBJECTS
+              if (node.type == NodeType.teacherNode)
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Text(
+                    (node.data as Teacher).subjects.join(', '),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+
+              // SPECIAL NEEDS TEXT
+              if (isSpecialNeeds)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Special',
+                    style: TextStyle(
+                      fontSize: 7,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFD32F2F),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // Flag badge in top-right corner for special-needs students
+        if (isSpecialNeeds)
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD32F2F),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFD32F2F).withOpacity(0.4),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.priority_high_rounded,
+                  size: 11, color: Colors.white),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -872,6 +1041,23 @@ class _ClassNetworkPageState extends State<ClassNetworkPage>
 
           _students = studentSnap.data!.docs.map((doc) {
             final d = doc.data() as Map<String, dynamic>;
+            // Track special-needs flag in side maps so we don't have to
+            // change the Student model (which would ripple through the
+            // rest of the project).
+            if (d['hasSpecialNeeds'] == true) {
+              _specialNeedsIds.add(doc.id);
+              _specialNeedsDetails[doc.id] = {
+                'conditions': (d['specialConditions'] as List?)
+                        ?.map((e) => e.toString())
+                        .where((s) => s != 'None')
+                        .toList() ??
+                    const <String>[],
+                'others': (d['specialConditionsOthers'] ?? '').toString(),
+              };
+            } else {
+              _specialNeedsIds.remove(doc.id);
+              _specialNeedsDetails.remove(doc.id);
+            }
             return Student(
               id: doc.id,
               name: d['name'] ?? 'Unknown',
